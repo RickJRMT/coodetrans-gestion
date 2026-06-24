@@ -4,12 +4,14 @@ import {
   LayoutDashboard, FolderOpen, Package, History, Settings,
 } from 'lucide-react';
 import logo from '../assets/coodetransLogo.png';
+import useAppVersion from '../hooks/useAppVersion';
 
 /**
  * Sidebar — Barra lateral colapsable.
  * Comportamiento: minimizada por defecto (solo iconos). Se expande
  * automáticamente al pasar el cursor (hover) con animaciones suaves.
  */
+
 
 const NAV_ITEMS = [
   { to: '/dashboard',     label: 'Dashboard',                  Icon: LayoutDashboard },
@@ -20,6 +22,7 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar() {
+  const version = useAppVersion();
   const [expandida, setExpandida] = useState(false);
 
   return (
@@ -99,7 +102,7 @@ export default function Sidebar() {
       {/* Pie con marca RickLabs */}
       <div className="border-t border-white/10 px-3 py-3 flex flex-col items-center gap-1">
         {expandida && (
-          <span className="text-white/25 text-[10px]">v1.0.0 — SQLite3 Local</span>
+          <span className="text-white/25 text-[10px]">v{version} — SQLite3 Local</span>
         )}
         <span className="text-white/25 text-[9px] tracking-wide whitespace-nowrap">
           {expandida ? 'Desarrollado por RickLabs' : 'RL'}

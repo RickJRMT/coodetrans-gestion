@@ -10,8 +10,11 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import Select from '../components/Select';
 import Modal from '../components/Modal';
+import AutoCompleteInput from '../components/AutoCompleteInput';
 import { api, ES_ELECTRON } from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
+import { formatNombre, formatCedula } from '../utils/format';
+import useAppVersion from '../hooks/useAppVersion';
 
 const TABS = [
   { id: 'usuarios', label: 'Usuarios', Icon: Users },
@@ -116,7 +119,7 @@ function TabUsuarios({ idUsuario }) {
             {usuarios.map((u) => (
               <tr key={u.id_usuario} className="border-b border-edge/70 last:border-0 hover:bg-canvas/60">
                 <td className="px-4 py-3 font-medium text-ink-dark">@{u.username}</td>
-                <td className="px-4 py-3 text-ink">{u.nombre_completo || '—'}</td>
+                <td className="px-4 py-3 text-ink">{formatNombre(u.nombre_completo)}</td>
                 <td className="px-4 py-3"><Badge tone={u.rol === 'Administrador' ? 'info' : 'neutral'}>{u.rol}</Badge></td>
                 <td className="px-4 py-3 text-xs text-muted">{fmtFechaHora(u.ultimo_acceso)}</td>
                 <td className="px-4 py-3"><EstadoBadge estado={u.estado} /></td>
@@ -155,7 +158,7 @@ function TabUsuarios({ idUsuario }) {
             onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} />
           <Input type="password" label={editando ? 'Nueva contraseña (dejar vacío para mantener)' : 'Contraseña *'}
             value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <Select label="Rol *" value={form.rol} onChange={(e) => setForm((f) => ({ ...f, rol: e.target.value }))}>
               <option value="">Seleccione...</option>
               {roles.map((r) => <option key={r.id_rol} value={r.nombre}>{r.nombre}</option>)}
@@ -165,11 +168,19 @@ function TabUsuarios({ idUsuario }) {
               <option value="Inactivo">Inactivo</option>
             </Select>
           </div>
-          <Select label="Empleado vinculado (opcional)" value={form.fk_id_empleado}
-            onChange={(e) => setForm((f) => ({ ...f, fk_id_empleado: e.target.value }))}>
-            <option value="">Sin empleado vinculado</option>
-            {empleados.map((e) => <option key={e.id_empleado} value={e.id_empleado}>{e.nombre_completo}</option>)}
-          </Select>
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-subtle">Empleado vinculado (opcional)</p>
+            <AutoCompleteInput
+              items={empleados}
+              value={form.fk_id_empleado}
+              onChange={(e) => setForm((f) => ({ ...f, fk_id_empleado: e?.id_empleado || '' }))}
+              getLabel={(e) => formatNombre(e.nombre_completo)}
+              filterFields={['nombre_completo', 'cedula', 'nom_area']}
+              placeholder="Sin empleado vinculado"
+              searchPlaceholder="Buscar empleado..."
+              allowFreeText={false}
+            />
+          </div>
         </div>
       </Modal>
     </Card>
@@ -506,7 +517,7 @@ function TabBaseDatos() {
     try {
       const r = await api.bd.restore();
       setMensaje(r.ok
-        ? { tipo: 'ok', texto: 'Base de datos restaurada. Recargando la aplicación...' }
+        ? { tipo: 'ok', texto: 'Base de datos restaurada. Actualizando la información...' }
         : { tipo: 'error', texto: r.error });
     } finally { setOcupado(false); }
   };
@@ -542,7 +553,7 @@ function TabBaseDatos() {
         <Card className="p-5">
           <HardDriveUpload className="text-warn mb-3" size={24} />
           <h4 className="font-semibold text-ink-dark mb-1">Restaurar</h4>
-          <p className="text-xs text-subtle mb-4">Reemplace los datos actuales con los de una copia previa. La app se reiniciará.</p>
+          <p className="text-xs text-subtle mb-4">Reemplace los datos actuales con los de una copia previa. La sesión se mantendrá activa.</p>
           <Button variant="secondary" icon={HardDriveUpload} onClick={restaurar} disabled={ocupado}>Restaurar copia</Button>
         </Card>
       </div>
@@ -560,9 +571,10 @@ function TabBaseDatos() {
    PESTAÑA: SISTEMA
 ════════════════════════════════════════════════════════════════════ */
 function TabSistema() {
+  const version = useAppVersion();
   const filas = [
     ['Aplicación', 'Coodetrans — Gestión de Dotación y Archivo'],
-    ['Versión', '1.0.0'],
+    ['Versión', version],
     ['Plataforma', ES_ELECTRON ? 'Aplicación de escritorio (Electron)' : 'Vista previa en navegador'],
     ['Base de datos', 'SQLite local (better-sqlite3)'],
     ['Arquitectura', 'MVC — Modelos · Repositorios · Controladores · IPC · React'],

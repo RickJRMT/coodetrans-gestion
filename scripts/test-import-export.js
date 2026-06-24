@@ -12,6 +12,10 @@ const {
   detectarFilaEncabezado,
   detectarColumnas,
   esCedulaValida,
+  convertirFecha,
+  resolverFechasEmpleado,
+  formatearFechaExport,
+  COLUMNAS_EXPORT,
 } = require('../src/services/importExportService');
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coodetrans-test-'));
@@ -107,6 +111,51 @@ function formatCedula(c) {
   return d.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 assert(formatCedula('1234567890') === '1.234.567.890', 'Formato visual de cédula');
+
+// 6) Fechas: serial Excel, formato regional y F/Novedad para retirados
+assert(convertirFecha(44927) === '2023-01-01', 'Serial Excel 44927 → 2023-01-01');
+assert(convertirFecha('15/03/2020') === '2020-03-15', 'DD/MM/YYYY colombiano');
+assert(formatearFechaExport('2020-03-15') === '15/03/2020', 'Exportación DD/MM/YYYY');
+
+const fechasRet = resolverFechasEmpleado({
+  estado: 'Retirado',
+  fechaIngreso: null,
+  fechaRetiro: null,
+  fNovedad: '2024-06-10',
+  tieneColIngreso: false,
+  tieneColRetiro: false,
+});
+assert(fechasRet.fecha_retiro === '2024-06-10' && !fechasRet.fecha_ingreso,
+  'F/Novedad de retirado va a fecha_retiro, no a fecha_ingreso');
+
+const fechasIng = resolverFechasEmpleado({
+  estado: 'Activo',
+  fechaIngreso: null,
+  fechaRetiro: null,
+  fNovedad: '2019-01-15',
+  tieneColIngreso: false,
+  tieneColRetiro: false,
+});
+assert(fechasIng.fecha_ingreso === '2019-01-15', 'F/Novedad de activo puede usarse como ingreso');
+
+const filasRetirados = [
+  ['Codigo', 'Nombre del Empleado', 'Area', 'Novedad', 'F/Novedad'],
+  ['1234567890', 'Pedro Retirado', 'Operaciones', 'Retirado', '30/12/2025'],
+];
+const idxRet = detectarFilaEncabezado(filasRetirados);
+const mapaRet = detectarColumnas(filasRetirados[idxRet].map(String), filasRetirados, idxRet);
+assert(mapaRet.f_novedad != null && mapaRet.fecha_ingreso == null,
+  'F/Novedad ya no se mapea directamente a fecha_ingreso');
+
+const rutaRet = crearXlsx('retirados-fnovedad.xlsx', [['Hoja1', filasRetirados]]);
+const resRet = parsearArchivo(rutaRet);
+assert(resRet.filasValidas[0].fecha_retiro === '2025-12-30', 'Importación: F/Novedad → fecha_retiro');
+assert(!resRet.filasValidas[0].fecha_ingreso, 'Importación: fecha_ingreso vacía si no hay columna dedicada');
+
+// 7) Orden fijo de columnas de exportación
+const idxIng = COLUMNAS_EXPORT.findIndex((c) => c.encabezado === 'Fecha Ingreso');
+const idxRetiro = COLUMNAS_EXPORT.findIndex((c) => c.encabezado === 'Fecha Retiro');
+assert(idxIng >= 0 && idxRetiro === idxIng + 1, 'Fecha Retiro inmediatamente después de Fecha Ingreso');
 
 console.log(`\n=== Resultado: ${passed} OK, ${failed} fallos ===\n`);
 fs.rmSync(tmpDir, { recursive: true, force: true });

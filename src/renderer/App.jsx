@@ -7,6 +7,8 @@ import CarpetasPage from './pages/CarpetasPage';
 import InventarioPage from './pages/InventarioPage';
 import MovimientosPage from './pages/MovimientosPage';
 import ConfiguracionPage from './pages/ConfiguracionPage';
+import { useEffect } from 'react';
+import useUpdater from './hooks/useUpdater';
 
 /** Protege rutas privadas: redirige al login si no hay sesión. */
 function RutaPrivada({ children }) {
@@ -41,9 +43,12 @@ function Enrutador() {
 }
 
 export default function App() {
+  useUpdater();
   return (
     <AuthProvider>
       <Enrutador />
     </AuthProvider>
   );
 }
+
+

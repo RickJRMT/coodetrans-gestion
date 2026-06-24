@@ -1,8 +1,17 @@
-LICENCIA DE USO - COODETRANS GESTION
 
-Copyright (c) 2026 RickLabs. Todos los derechos reservados.
+      COODETRANS GESTIÓN
 
-Este software se distribuye bajo licencia MIT para uso autorizado por Coodetrans
-y sus operadores designados.
+      Licencia de Uso Interno
 
-Para soporte tecnico contacte a RickLabs.
+      Copyright © 2026 RickLabs.
+
+      Este software fue desarrollado por RickLabs como parte de las actividades realizadas para Coodetrans.
+
+      La aplicación está destinada exclusivamente al uso interno de Coodetrans y no podrá ser distribuida, comercializada o cedida a terceros sin autorización expresa.
+
+      Todos los derechos de autor sobre el código fuente, documentación técnica y recursos asociados permanecen protegidos por la legislación aplicable sobre propiedad intelectual.
+
+      El software se proporciona "tal cual", sin garantías expresas o implícitas.
+
+      RickLabs
+      2026

@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { useState, version } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, LogIn, AlertCircle } from 'lucide-react';
 import logo from '../assets/coodetransLogo.png';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import { useAuth } from '../hooks/useAuth';
+import useAppVersion from '../hooks/useAppVersion';
 
 /**
  * LoginPage — Pantalla de autenticación contra la tabla usuario.
  * Diseño moderno de dos columnas con identidad corporativa Coodetrans.
  */
 export default function LoginPage() {
+  const version = useAppVersion();
   const navigate = useNavigate();
   const { login } = useAuth();
   const [username, setUsername] = useState('');
@@ -53,7 +55,7 @@ export default function LoginPage() {
 
         <div className="relative z-10">
           <h2 className="text-3xl font-extrabold leading-tight mb-4">
-            Control documental e<br />inventario en un solo lugar
+            Control documental e<br />inventarios
           </h2>
           <p className="text-white/70 text-sm max-w-md leading-relaxed">
             Administre hojas de vida físicas, ubicaciones de archivo, stock de
@@ -63,7 +65,7 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10 text-white/40 text-xs">
-          v1.0.0 — Edición Local · Desarrollado por RickLabs
+          v{version} — Edición Local · Desarrollado por RickLabs
         </div>
       </div>
 

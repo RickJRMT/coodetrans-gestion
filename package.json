@@ -4,7 +4,7 @@
   "description": "Aplicación de escritorio para gestión documental e inventario de Coodetrans",
   "author": {
     "name": "RickLabs",
-    "email": "contacto@ricklabs.co"
+    "email": "jurimat.julian@gmail.com"
   },
   "homepage": "https://www.coodetrans.com",
   "license": "MIT",
@@ -18,14 +18,18 @@
     "build": "npm run prepare:icons && npm run build:renderer && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --x64",
     "build:portable": "npm run prepare:icons && npm run build:renderer && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win portable --x64",
     "build:installer": "npm run prepare:icons && npm run build:renderer && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis --x64",
+    "build:signed": "npm run prepare:icons && npm run build:renderer && electron-builder --win --x64",
+    "build:signed:installer": "npm run prepare:icons && npm run build:renderer && electron-builder --win nsis --x64",
     "build:all": "npm run build:renderer && electron-builder -mwl",
     "start": "cross-env NODE_ENV=development electron .",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "prepare:icons": "node scripts/prepare-icons.js",
-    "test:import": "node scripts/test-import-export.js"
+    "test:import": "node scripts/test-import-export.js",
+    "test:export": "node scripts/test-import-export.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
+    "electron-updater": "^6.6.2",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -43,6 +47,7 @@
     "electron-builder": "^25.1.8",
     "png-to-ico": "^3.0.1",
     "postcss": "^8.4.49",
+    "sharp": "^0.33.5",
     "tailwindcss": "^3.4.15",
     "vite": "^6.0.3",
     "wait-on": "^8.0.1"
@@ -76,6 +81,14 @@
       {
         "from": "src/database/schema.sql",
         "to": "schema.sql"
+      },
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      },
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
       }
     ],
     "asarUnpack": [
@@ -85,19 +98,27 @@
       "target": [
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico",
       "publisherName": "RickLabs",
+      "executableName": "CoodetransGestion",
       "verifyUpdateCodeSignature": false,
-      "signAndEditExecutable": false,
-      "legalTrademarks": "Coodetrans® es marca de la cooperativa Coodetrans.",
-      "requestedExecutionLevel": "asInvoker"
+      "legalTrademarks": "Coodetrans es marca de la cooperativa Coodetrans.",
+      "requestedExecutionLevel": "asInvoker",
+      "signtoolOptions": {
+        "publisherName": "RickLabs",
+        "rfc3161TimeStampServer": "http://timestamp.digicert.com"
+      }
     },
     "nsis": {
       "oneClick": false,
@@ -107,6 +128,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Coodetrans Gestión",
+      "uninstallDisplayName": "Coodetrans Gestión",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
@@ -128,8 +150,12 @@
       "target": "AppImage",
       "icon": "build/icon.png",
       "category": "Office",
-      "maintainer": "RickLabs <contacto@ricklabs.co>"
+      "maintainer": "RickLabs <jurimat.julian@gmail.com>"
     },
-    "publish": null
+    "publish": {
+      "provider": "github",
+      "owner": "RickJRMT",
+      "repo": "coodetrans-gestion"
+    }
   }
 }

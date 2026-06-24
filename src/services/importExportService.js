@@ -29,18 +29,48 @@ const MESES = {
   oct: '10', nov: '11', dic: '12', dec: '12',
 };
 
+/** Convierte serial numérico de Excel (días desde 1899-12-30) a ISO YYYY-MM-DD. */
+function serialExcelAFecha(serial) {
+  const n = Number(serial);
+  if (!Number.isFinite(n) || n < 1 || n > 500000) return null;
+  const epoch = Date.UTC(1899, 11, 30);
+  const ms = epoch + Math.round(n * 86400000);
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return null;
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function convertirFecha(valor) {
-  if (!valor) return null;
+  if (valor == null || valor === '') return null;
+
+  if (valor instanceof Date && !Number.isNaN(valor.getTime())) {
+    const y = valor.getFullYear();
+    const m = String(valor.getMonth() + 1).padStart(2, '0');
+    const d = String(valor.getDate()).padStart(2, '0');
+
+    return `${y}-${m}-${d}`;
+  }
+
   const v = String(valor).trim();
   if (!v) return null;
 
-  let m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (/^\d+(\.\d+)?$/.test(v)) {
+    const desdeSerial = serialExcelAFecha(v);
+    if (desdeSerial) return desdeSerial;
+  }
+
+  let m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
 
   m = v.match(/^([A-Za-zÁ-úñÑ]{3,})\s+(\d{1,2})[\/\-](\d{4})$/);
   if (m) {
     const mes = MESES[normalizar(m[1]).slice(0, 3)];
-    if (mes) return `${m[3]}-${mes}-${String(m[2]).padStart(2, '0')}`;
+    if (mes) {
+      return `${m[3]}-${mes}-${String(m[2]).padStart(2, '0')}`;
+    }
   }
 
   m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
@@ -51,10 +81,59 @@ function convertirFecha(valor) {
   m = v.match(/^(\d{1,2})\s+([A-Za-zÁ-úñÑ]{3,})\s+(\d{4})$/);
   if (m) {
     const mes = MESES[normalizar(m[2]).slice(0, 3)];
-    if (mes) return `${m[3]}-${mes}-${String(m[1]).padStart(2, '0')}`;
+    if (mes) {
+      return `${m[3]}-${mes}-${String(m[1]).padStart(2, '0')}`;
+    }
+  }
+
+  // MM/DD/YY o MM/DD/YYYY
+  m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+
+  if (m) {
+    let anio = Number(m[3]);
+
+    if (anio < 100) {
+      anio += anio < 50 ? 2000 : 1900;
+    }
+
+    const mes = String(m[1]).padStart(2, '0');
+    const dia = String(m[2]).padStart(2, '0');
+
+    return `${anio}-${mes}-${dia}`;
   }
 
   return null;
+}
+
+/** Formato legible para exportación (DD/MM/YYYY). La BD conserva ISO. */
+function formatearFechaExport(iso) {
+  if (!iso) return '';
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(iso);
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+/**
+ * Resuelve fechas de ingreso/retiro sin cruzar columnas.
+ * F/Novedad en plantillas Tipo 2 suele ser la fecha del cambio de estado (retiro),
+ * no la fecha de ingreso del empleado.
+ */
+function resolverFechasEmpleado({ estado, fechaIngreso, fechaRetiro, fNovedad, tieneColIngreso, tieneColRetiro }) {
+  let ingreso = fechaIngreso;
+  let retiro = fechaRetiro;
+
+  if (estado === 'Retirado') {
+    if (!retiro && fNovedad) retiro = fNovedad;
+    if (!tieneColIngreso && ingreso === fNovedad) ingreso = null;
+  } else if (!ingreso && fNovedad && !tieneColRetiro) {
+    ingreso = fNovedad;
+  }
+
+  if (ingreso && retiro && ingreso === retiro && !tieneColIngreso && tieneColRetiro) {
+    ingreso = null;
+  }
+
+  return { fecha_ingreso: ingreso, fecha_retiro: retiro };
 }
 
 function normalizarEstado(valor) {
@@ -125,25 +204,115 @@ function detectarColumnas(headers, filas = [], indiceEncabezado = 0) {
     const n = normalizar(h);
     if (!n) return;
 
-    if (['nombre del empleado', 'nombre empleado', 'nombre completo', 'nombre', 'empleado'].includes(n) || n.includes('nombre')) {
+    // Nombre
+    if (
+      [
+        'nombre del empleado',
+        'nombre empleado',
+        'nombre completo',
+        'nombre',
+        'empleado'
+      ].includes(n) ||
+      n.includes('nombre')
+    ) {
       if (mapa.nombre == null) mapa.nombre = i;
     }
-    if (n === 'novedad' || n === 'estado') { if (mapa.novedad == null) mapa.novedad = i; }
-    if (['ubicacion', 'ubicacion fisica', 'ubicación', 'ubicación fisica'].includes(n) || n.includes('ubicacion')) {
+
+    // Estado / Novedad
+    if (n === 'novedad') {
+      if (mapa.novedad == null) mapa.novedad = i;
+    }
+
+    if (n === 'estado') {
+      if (mapa.estado == null) mapa.estado = i;
+    }
+
+    // Ubicación
+    if (
+      [
+        'ubicacion',
+        'ubicacion fisica',
+        'ubicación',
+        'ubicación fisica'
+      ].includes(n) ||
+      n.includes('ubicacion')
+    ) {
       if (mapa.ubicacion == null) mapa.ubicacion = i;
     }
-    if (n === 'area' || n === 'área' || (n.includes('area') && !n.includes('subarea'))) {
+
+    // Área
+    if (
+      n === 'area' ||
+      n === 'área' ||
+      (n.includes('area') && !n.includes('subarea'))
+    ) {
       if (mapa.area == null) mapa.area = i;
     }
-    if (n === 'cargo' || n.includes('cargo')) { if (mapa.cargo == null) mapa.cargo = i; }
-    if (['observaciones', 'observacion', 'notas', 'comentarios', 'nota'].includes(n) || n.includes('observacion')) {
+
+    // Cargo
+    if (n === 'cargo' || n.includes('cargo')) {
+      if (mapa.cargo == null) mapa.cargo = i;
+    }
+
+    // Observaciones
+    if (
+      ['observaciones', 'observacion', 'notas', 'comentarios', 'nota'].includes(n) ||
+      n.includes('observacion')
+    ) {
       if (mapa.observaciones == null) mapa.observaciones = i;
     }
-    if (['f/novedad', 'f novedad', 'fecha ingreso', 'fecha de ingreso', 'fecha_ingreso'].includes(n)) {
+
+    // Fecha Ingreso
+    if (
+      [
+        'fecha ingreso',
+        'fecha de ingreso',
+        'f/ingreso',
+        'f ingreso',
+        'fecha_ingreso'
+      ].includes(n)
+    ) {
       if (mapa.fecha_ingreso == null) mapa.fecha_ingreso = i;
     }
-    if (['fecha retiro', 'fecha de retiro', 'f/retiro', 'fecha_retiro'].includes(n)) {
+
+    // Fecha Retiro
+    if (
+      [
+        'fecha retiro',
+        'fecha de retiro',
+        'f/retiro',
+        'f retiro',
+        'fecha_retiro'
+      ].includes(n)
+    ) {
       if (mapa.fecha_retiro == null) mapa.fecha_retiro = i;
+    }
+
+    // F/Novedad
+    if (
+      [
+        'f/novedad',
+        'f novedad',
+        'fecha novedad'
+      ].includes(n)
+    ) {
+      if (mapa.f_novedad == null) mapa.f_novedad = i;
+    }
+
+    // Código / Cédula / Documento ID
+    if (
+      [
+        'codigo',
+        'código',
+        'cedula',
+        'cédula',
+        'codigo/cedula',
+        'codigo cedula',
+        'documento id',
+        'documento'
+      ].includes(n)
+    ) {
+      if (mapa.codigo == null) mapa.codigo = i;
     }
   });
 
@@ -181,7 +350,7 @@ function detectarFilaEncabezado(filas) {
   const limite = Math.min(filas.length, MAX_FILAS_ESCANEO);
   for (let i = 0; i < limite; i++) {
     const score = puntuarFilaEncabezado(filas[i]);
-    if (score >= 5 && score > mejor.score) {
+    if (score >= 4 && score > mejor.score) {
       mejor = { idx: i, score };
     }
   }
@@ -199,7 +368,7 @@ function leerFilasDesdeHoja(ws) {
 
 function leerWorkbook(rutaArchivo) {
   const ext = path.extname(rutaArchivo).toLowerCase();
-  const opts = { cellDates: false, raw: false, sheetStubs: true };
+  const opts = { cellDates: true, raw: true, sheetStubs: true };
   if (ext === '.csv') {
     const contenido = fs.readFileSync(rutaArchivo, 'utf-8').replace(/^\ufeff/, '');
     return XLSX.read(contenido, { ...opts, type: 'string' });
@@ -261,8 +430,53 @@ function parsearFilasConEncabezado(filas, indiceEncabezado, nombreHoja) {
     const ubicacion = get('ubicacion');
     const observaciones = get('observaciones');
     const novedad = get('novedad');
-    const fIngreso = get('fecha_ingreso');
-    const fRetiro = get('fecha_retiro');
+
+    const estadoExcel =
+      mapa.estado != null
+        ? String(fila[mapa.estado] ?? '').trim()
+        : '';
+
+    const fIngresoRaw =
+      mapa.fecha_ingreso != null
+        ? get('fecha_ingreso')
+        : '';
+
+    const fRetiroRaw =
+      mapa.fecha_retiro != null
+        ? get('fecha_retiro')
+        : '';
+
+    const fNovedadRaw =
+      mapa.f_novedad != null
+        ? get('f_novedad')
+        : '';
+
+    const estado = normalizarEstado(
+      estadoExcel || novedad
+    );
+
+    // console.log('====================================');
+    // console.log('Empleado:', nombre);
+    // console.log('Estado:', estado);
+
+    // console.log('Fecha Retiro RAW:', fRetiroRaw);
+    // console.log('Fecha Retiro Convertida:', convertirFecha(fRetiroRaw));
+
+    // console.log('F/Novedad RAW:', fNovedadRaw);
+    // console.log('F/Novedad Convertida:', convertirFecha(fNovedadRaw));
+
+    // console.log('Mapa columnas:', mapa);
+    // console.log('====================================');
+
+    const fechas = resolverFechasEmpleado({
+      estado,
+      fechaIngreso: convertirFecha(fIngresoRaw),
+      fechaRetiro: convertirFecha(fRetiroRaw),
+      fNovedad: convertirFecha(fNovedadRaw),
+      tieneColIngreso: mapa.fecha_ingreso != null,
+      tieneColRetiro: mapa.fecha_retiro != null,
+    });
+    // console.log('Resultado final fechas:', fechas);
 
     const faltantes = [];
     if (!cedula) faltantes.push('Código/Cédula');
@@ -281,9 +495,9 @@ function parsearFilasConEncabezado(filas, indiceEncabezado, nombreHoja) {
       cargo: cargo || null,
       ubicacion_fisica: ubicacion || null,
       observaciones: observaciones || null,
-      estado: normalizarEstado(novedad),
-      fecha_ingreso: convertirFecha(fIngreso),
-      fecha_retiro: convertirFecha(fRetiro),
+      estado,
+      fecha_ingreso: fechas.fecha_ingreso,
+      fecha_retiro: fechas.fecha_retiro,
     };
 
     if (faltantes.length) {
@@ -507,7 +721,7 @@ function importarEmpleados(filasValidas, idUsuario = null) {
               nombre_completo = ?, estado = ?, ubicacion_fisica = ?, observaciones = ?,
               fk_id_area = ?, fk_id_cargo = ?,
               fecha_ingreso = COALESCE(?, fecha_ingreso),
-              fecha_retiro = ?, updatedAt = datetime('now','localtime')
+              fecha_retiro = COALESCE(?, fecha_retiro), updatedAt = datetime('now','localtime')
             WHERE id_empleado = ?`)
             .run(
               fila.nombre_completo, fila.estado, fila.ubicacion_fisica, fila.observaciones || null,
@@ -562,6 +776,23 @@ function importarEmpleados(filasValidas, idUsuario = null) {
   }
 }
 
+/** Columnas de exportación en orden fijo (evita desalineación en Excel/CSV). */
+const COLUMNAS_EXPORT = [
+  { clave: 'cedula', encabezado: 'Cédula' },
+  { clave: 'nombre_completo', encabezado: 'Nombre' },
+  { clave: 'nom_area', encabezado: 'Área' },
+  { clave: 'nom_cargo', encabezado: 'Cargo' },
+  { clave: 'genero', encabezado: 'Género' },
+  { clave: 'camisa', encabezado: 'Talla Camisa' },
+  { clave: 'pantalon', encabezado: 'Talla Pantalón' },
+  { clave: 'calzado', encabezado: 'Talla Zapato' },
+  { clave: 'fecha_ingreso', encabezado: 'Fecha Ingreso' },
+  { clave: 'fecha_retiro', encabezado: 'Fecha Retiro' },
+  { clave: 'estado', encabezado: 'Estado' },
+  { clave: 'ubicacion_fisica', encabezado: 'Ubicación Física' },
+  { clave: 'observaciones', encabezado: 'Observaciones' },
+];
+
 function exportarEmpleados(filtro, formato, rutaDestino) {
   try {
     const db = getDb();
@@ -570,19 +801,19 @@ function exportarEmpleados(filtro, formato, rutaDestino) {
     else if (filtro === 'retirados') where = "WHERE e.estado = 'Retirado'";
 
     const filas = db.prepare(`
-      SELECT e.cedula AS "Cédula",
-             e.nombre_completo AS "Nombre",
-             COALESCE(ad.nom_area, ac.nom_area, '') AS "Área",
-             COALESCE(c.nom_cargo, '') AS "Cargo",
-             COALESCE(e.genero, '') AS "Género",
-             COALESCE(t.camisa, '') AS "Talla Camisa",
-             COALESCE(t.pantalon, '') AS "Talla Pantalón",
-             COALESCE(t.calzado, '') AS "Talla Zapato",
-             COALESCE(e.fecha_ingreso, '') AS "Fecha Ingreso",
-             COALESCE(e.fecha_retiro, '') AS "Fecha Retiro",
-             e.estado AS "Estado",
-             COALESCE(e.ubicacion_fisica, '') AS "Ubicación Física",
-             COALESCE(e.observaciones, '') AS "Observaciones"
+      SELECT e.cedula,
+             e.nombre_completo,
+             COALESCE(ad.nom_area, ac.nom_area, '') AS nom_area,
+             COALESCE(c.nom_cargo, '') AS nom_cargo,
+             COALESCE(e.genero, '') AS genero,
+             COALESCE(t.camisa, '') AS camisa,
+             COALESCE(t.pantalon, '') AS pantalon,
+             COALESCE(t.calzado, '') AS calzado,
+             e.fecha_ingreso,
+             e.fecha_retiro,
+             e.estado,
+             COALESCE(e.ubicacion_fisica, '') AS ubicacion_fisica,
+             COALESCE(e.observaciones, '') AS observaciones
       FROM empleado e
       LEFT JOIN cargo c  ON c.id_cargo = e.fk_id_cargo
       LEFT JOIN area ad  ON ad.id_area = e.fk_id_area
@@ -591,7 +822,14 @@ function exportarEmpleados(filtro, formato, rutaDestino) {
       ${where}
       ORDER BY COALESCE(ad.nom_area, ac.nom_area, ''), e.nombre_completo ASC`).all();
 
-    const ws = XLSX.utils.json_to_sheet(filas);
+    const encabezados = COLUMNAS_EXPORT.map((c) => c.encabezado);
+    const datos = filas.map((fila) => COLUMNAS_EXPORT.map(({ clave }) => {
+      if (clave === 'fecha_ingreso') return formatearFechaExport(fila.fecha_ingreso);
+      if (clave === 'fecha_retiro') return formatearFechaExport(fila.fecha_retiro);
+      return fila[clave] ?? '';
+    }));
+
+    const ws = XLSX.utils.aoa_to_sheet([encabezados, ...datos]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Empleados');
 
@@ -613,7 +851,10 @@ module.exports = {
   importarEmpleados,
   exportarEmpleados,
   convertirFecha,
+  formatearFechaExport,
+  resolverFechasEmpleado,
   detectarFilaEncabezado,
   detectarColumnas,
   esCedulaValida,
+  COLUMNAS_EXPORT,
 };

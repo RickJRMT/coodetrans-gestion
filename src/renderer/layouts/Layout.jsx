@@ -1,25 +1,56 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { LogOut, ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import { useAuth } from '../hooks/useAuth';
+import logo from '../assets/coodetransLogo.png';
 
 /** Metadatos de cada pantalla (título y subtítulo de la barra superior). */
 const META = {
-  '/dashboard':     { titulo: 'Dashboard', sub: 'Panel general de la operación' },
-  '/carpetas':      { titulo: 'Control de Carpetas Físicas', sub: 'Hojas de vida y ubicación física de carpetas' },
-  '/inventario':    { titulo: 'Inventario General', sub: 'Administración de dotaciones y stock' },
-  '/movimientos':   { titulo: 'Historial de Movimientos', sub: 'Entregas de dotación y actividad del sistema' },
+  '/dashboard': { titulo: 'Dashboard', sub: 'Panel general de la operación' },
+  '/carpetas': { titulo: 'Control de Carpetas Físicas', sub: 'Hojas de vida y ubicación física de carpetas' },
+  '/inventario': { titulo: 'Inventario General', sub: 'Administración de dotaciones y stock' },
+  '/movimientos': { titulo: 'Historial de Movimientos', sub: 'Entregas de dotación y actividad del sistema' },
   '/configuracion': { titulo: 'Configuración', sub: 'Usuarios, roles y estructura organizacional' },
 };
 
+
 export default function Layout() {
+  const instalarActualizacion = async () => {
+    try {
+      await window.api?.update?.instalar?.();
+    } catch (error) {
+      console.error('Error instalando actualización:', error);
+    }
+  };
+  const [actualizacionDisponible, setActualizacionDisponible] = useState(null);
+  const [actualizacionLista, setActualizacionLista] = useState(null);
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { usuario, logout } = useAuth();
   const [menuAbierto, setMenuAbierto] = useState(false);
 
   const meta = META[pathname] || { titulo: 'Coodetrans', sub: '' };
+
+  useEffect(() => {
+
+    const limpiar1 =
+      window.api?.update?.disponible?.((info) => {
+        setActualizacionDisponible(info);
+      });
+
+    const limpiar2 =
+      window.api?.update?.descargada?.((info) => {
+        setActualizacionDisponible(null);
+        setActualizacionLista(info);
+      });
+
+    return () => {
+      limpiar1?.();
+      limpiar2?.();
+    };
+
+  }, []);
 
   const cerrarSesion = () => {
     logout();
@@ -42,9 +73,12 @@ export default function Layout() {
         {/* Barra superior */}
         <header className="h-[68px] bg-white border-b border-edge flex items-center
           justify-between px-6 shrink-0 z-10">
-          <div>
-            <h1 className="text-lg font-bold text-ink-dark leading-tight">{meta.titulo}</h1>
-            <p className="text-xs text-subtle">{meta.sub}</p>
+          <div className="flex items-center gap-3 min-w-0">
+            <img src={logo} alt="Coodetrans" className="w-9 h-9 object-contain shrink-0 lg:hidden" />
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-ink-dark leading-tight truncate">{meta.titulo}</h1>
+              <p className="text-xs text-subtle truncate">{meta.sub}</p>
+            </div>
           </div>
 
           {/* Menú de usuario */}
@@ -97,6 +131,72 @@ export default function Layout() {
           </div>
         </main>
       </div>
+      {actualizacionDisponible && !actualizacionLista && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-[420px] shadow-xl">
+            <h2 className="text-lg font-bold mb-2">
+              Nueva actualización disponible
+            </h2>
+
+            <p className="text-sm text-gray-600">
+              Se encontró una nueva versión de Coodetrans Gestión.
+            </p>
+
+            <p className="text-sm mt-2 font-medium">
+              Versión: {actualizacionDisponible?.version}
+            </p>
+
+            <div className="mt-4 flex items-center gap-3">
+              <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+
+              <span className="text-sm">
+                Descargando actualización...
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+      {actualizacionLista && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-[450px] shadow-xl">
+
+            <h2 className="text-lg font-bold mb-2">
+              Actualización lista
+            </h2>
+
+            <p className="text-sm text-gray-600">
+              La nueva versión ya fue descargada.
+            </p>
+
+            <p className="text-sm mt-2 font-medium">
+              Versión: {actualizacionLista?.version}
+            </p>
+
+            <p className="text-sm mt-2">
+              Es necesario reiniciar la aplicación para completar la instalación.
+            </p>
+
+            <div className="mt-5 flex justify-end gap-2">
+
+              <button
+                onClick={() => setActualizacionLista(null)}
+                className="px-4 py-2 border rounded-lg"
+              >
+                Más tarde
+              </button>
+
+              <button
+                onClick={instalarActualizacion}
+                className="px-4 py-2 bg-primary text-white rounded-lg"
+              >
+                Actualizar ahora
+              </button>
+
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
