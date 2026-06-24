@@ -50,6 +50,8 @@
       "src/models/**/*",
       "src/controllers/**/*",
       "src/repositories/**/*",
+      "src/services/**/*",
+      "src/config/**/*",
       "dist-renderer/**/*",
       "package.json"
     ],

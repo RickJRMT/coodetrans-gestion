@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Users, Building2, Briefcase, Database, Info, Plus, Pencil, Power,
   AlertTriangle, RefreshCw, Save, HardDriveDownload, HardDriveUpload, ShieldCheck,
+  UserCog,
 } from 'lucide-react';
 import Card, { CardHeader } from '../components/Card';
 import Badge from '../components/Badge';
@@ -14,13 +15,12 @@ import { useAuth } from '../hooks/useAuth';
 
 const TABS = [
   { id: 'usuarios', label: 'Usuarios', Icon: Users },
+  { id: 'roles', label: 'Roles', Icon: UserCog },
   { id: 'areas', label: 'Áreas', Icon: Building2 },
   { id: 'cargos', label: 'Cargos', Icon: Briefcase },
   { id: 'bd', label: 'Base de datos', Icon: Database },
   { id: 'sistema', label: 'Sistema', Icon: Info },
 ];
-
-const ROLES = ['Administrador', 'Auxiliar'];
 
 function fmtFechaHora(iso) {
   if (!iso) return 'Nunca';
@@ -39,25 +39,29 @@ function EstadoBadge({ estado }) {
 function TabUsuarios({ idUsuario }) {
   const [usuarios, setUsuarios] = useState([]);
   const [empleados, setEmpleados] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [modal, setModal] = useState(false);
   const [editando, setEditando] = useState(null);
-  const [form, setForm] = useState({ username: '', password: '', rol: 'Auxiliar', fk_id_empleado: '', estado: 'Activo' });
+  const [form, setForm] = useState({ username: '', password: '', rol: '', fk_id_empleado: '', estado: 'Activo' });
   const [errorForm, setErrorForm] = useState('');
   const [guardando, setGuardando] = useState(false);
 
   const cargar = async () => {
     setCargando(true);
-    const [u, e] = await Promise.all([api.usuarios.listar(), api.empleados.listar()]);
+    const [u, e, r] = await Promise.all([
+      api.usuarios.listar(), api.empleados.listar(), api.roles.listarActivos(),
+    ]);
     if (u.ok) setUsuarios(u.data);
     if (e.ok) setEmpleados(e.data);
+    if (r.ok) setRoles(r.data);
     setCargando(false);
   };
   useEffect(() => { cargar(); }, []);
 
   const abrirNuevo = () => {
     setEditando(null);
-    setForm({ username: '', password: '', rol: 'Auxiliar', fk_id_empleado: '', estado: 'Activo' });
+    setForm({ username: '', password: '', rol: roles[0]?.nombre || '', fk_id_empleado: '', estado: 'Activo' });
     setErrorForm(''); setModal(true);
   };
   const abrirEditar = (u) => {
@@ -69,7 +73,7 @@ function TabUsuarios({ idUsuario }) {
   const guardar = async () => {
     setErrorForm('');
     if (!form.username.trim()) return setErrorForm('El nombre de usuario es obligatorio.');
-    if (!form.fk_id_empleado) return setErrorForm('Debe vincular el usuario a un empleado.');
+    if (!form.rol) return setErrorForm('Debe seleccionar un rol.');
     if (!editando && form.password.length < 4) return setErrorForm('La contraseña debe tener al menos 4 caracteres.');
     setGuardando(true);
     try {
@@ -152,19 +156,119 @@ function TabUsuarios({ idUsuario }) {
           <Input type="password" label={editando ? 'Nueva contraseña (dejar vacío para mantener)' : 'Contraseña *'}
             value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
           <div className="grid grid-cols-2 gap-4">
-            <Select label="Rol" value={form.rol} onChange={(e) => setForm((f) => ({ ...f, rol: e.target.value }))}>
-              {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            <Select label="Rol *" value={form.rol} onChange={(e) => setForm((f) => ({ ...f, rol: e.target.value }))}>
+              <option value="">Seleccione...</option>
+              {roles.map((r) => <option key={r.id_rol} value={r.nombre}>{r.nombre}</option>)}
             </Select>
             <Select label="Estado" value={form.estado} onChange={(e) => setForm((f) => ({ ...f, estado: e.target.value }))}>
               <option value="Activo">Activo</option>
               <option value="Inactivo">Inactivo</option>
             </Select>
           </div>
-          <Select label="Empleado vinculado *" value={form.fk_id_empleado}
+          <Select label="Empleado vinculado (opcional)" value={form.fk_id_empleado}
             onChange={(e) => setForm((f) => ({ ...f, fk_id_empleado: e.target.value }))}>
-            <option value="">Seleccione...</option>
+            <option value="">Sin empleado vinculado</option>
             {empleados.map((e) => <option key={e.id_empleado} value={e.id_empleado}>{e.nombre_completo}</option>)}
           </Select>
+        </div>
+      </Modal>
+    </Card>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PESTAÑA: ROLES
+════════════════════════════════════════════════════════════════════ */
+function TabRoles({ idUsuario }) {
+  const [roles, setRoles] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [form, setForm] = useState({ nombre: '', descripcion: '' });
+  const [errorForm, setErrorForm] = useState('');
+  const [guardando, setGuardando] = useState(false);
+
+  const cargar = async () => {
+    setCargando(true);
+    const r = await api.roles.listar();
+    if (r.ok) setRoles(r.data);
+    setCargando(false);
+  };
+  useEffect(() => { cargar(); }, []);
+
+  const abrirNuevo = () => { setEditando(null); setForm({ nombre: '', descripcion: '' }); setErrorForm(''); setModal(true); };
+  const abrirEditar = (r) => { setEditando(r.id_rol); setForm({ nombre: r.nombre, descripcion: r.descripcion || '' }); setErrorForm(''); setModal(true); };
+
+  const guardar = async () => {
+    setErrorForm('');
+    if (!form.nombre.trim()) return setErrorForm('El nombre del rol es obligatorio.');
+    setGuardando(true);
+    try {
+      const datos = { nombre: form.nombre, descripcion: form.descripcion };
+      const res = editando
+        ? await api.roles.actualizar(editando, datos, idUsuario)
+        : await api.roles.crear(datos, idUsuario);
+      if (!res.ok) { setErrorForm(res.error); return; }
+      setModal(false); await cargar();
+    } finally { setGuardando(false); }
+  };
+
+  const alternarEstado = async (r) => {
+    const nuevo = r.estado === 'Activo' ? 'Inactivo' : 'Activo';
+    await api.roles.cambiarEstado(r.id_rol, nuevo, idUsuario);
+    await cargar();
+  };
+
+  if (cargando) return <div className="grid place-items-center py-12 text-subtle"><RefreshCw className="animate-spin" /></div>;
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader title="Roles del sistema" subtitle={`${roles.length} rol(es)`} icon={UserCog}
+        action={<Button size="sm" icon={Plus} onClick={abrirNuevo}>Nuevo rol</Button>} />
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-edge bg-canvas/50">
+              {['Rol', 'Descripción', 'Estado', 'Acciones'].map((h) => (
+                <th key={h} className="text-left font-semibold text-subtle text-xs uppercase tracking-wide px-4 py-3">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {roles.map((r) => (
+              <tr key={r.id_rol} className="border-b border-edge/70 last:border-0 hover:bg-canvas/60">
+                <td className="px-4 py-3 font-medium text-ink-dark">{r.nombre}</td>
+                <td className="px-4 py-3 text-ink">{r.descripcion || '—'}</td>
+                <td className="px-4 py-3"><EstadoBadge estado={r.estado} /></td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => abrirEditar(r)} title="Editar"
+                      className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors"><Pencil size={16} /></button>
+                    <button onClick={() => alternarEstado(r)} title={r.estado === 'Activo' ? 'Desactivar' : 'Activar'}
+                      className={`grid place-items-center w-8 h-8 rounded-lg transition-colors ${r.estado === 'Activo' ? 'text-subtle hover:bg-danger-light hover:text-danger' : 'text-subtle hover:bg-ok-light hover:text-ok-dark'}`}><Power size={16} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Modal open={modal} onClose={() => setModal(false)} title={editando ? 'Editar rol' : 'Nuevo rol'} size="sm"
+        footer={<>
+          <Button variant="secondary" onClick={() => setModal(false)} disabled={guardando}>Cancelar</Button>
+          <Button onClick={guardar} disabled={guardando} icon={Save}>{guardando ? 'Guardando...' : 'Guardar'}</Button>
+        </>}>
+        {errorForm && <div className="mb-4 flex items-center gap-2 bg-danger-light text-danger text-sm rounded-lg px-3 py-2"><AlertTriangle size={16} /> {errorForm}</div>}
+        <div className="space-y-4">
+          <Input label="Nombre del rol *" value={form.nombre} onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))} />
+          <div>
+            <label className="block text-sm font-medium text-ink mb-1.5">Descripción</label>
+            <textarea value={form.descripcion} onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
+              rows={3} placeholder="Describa las responsabilidades de este rol (opcional)"
+              className="w-full rounded-lg border border-edge bg-white px-3 py-2 text-sm text-ink
+                placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none" />
+          </div>
         </div>
       </Modal>
     </Card>
@@ -458,7 +562,7 @@ function TabBaseDatos() {
 function TabSistema() {
   const filas = [
     ['Aplicación', 'Coodetrans — Gestión de Dotación y Archivo'],
-    ['Versión', '2.0.0 (Fase 2)'],
+    ['Versión', '1.0.0'],
     ['Plataforma', ES_ELECTRON ? 'Aplicación de escritorio (Electron)' : 'Vista previa en navegador'],
     ['Base de datos', 'SQLite local (better-sqlite3)'],
     ['Arquitectura', 'MVC — Modelos · Repositorios · Controladores · IPC · React'],
@@ -516,6 +620,7 @@ export default function ConfiguracionPage() {
 
       {/* Contenido de la pestaña */}
       {tab === 'usuarios' && <TabUsuarios idUsuario={idUsuario} />}
+      {tab === 'roles' && <TabRoles idUsuario={idUsuario} />}
       {tab === 'areas' && <TabAreas idUsuario={idUsuario} />}
       {tab === 'cargos' && <TabCargos idUsuario={idUsuario} />}
       {tab === 'bd' && <TabBaseDatos />}

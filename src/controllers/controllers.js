@@ -8,13 +8,14 @@
  */
 
 const {
-  usuarioRepo, areaRepo, cargoRepo, ubicacionRepo,
+  usuarioRepo, rolRepo, areaRepo, cargoRepo, ubicacionRepo,
   empleadoRepo, articuloRepo, entregaRepo, actividadRepo,
 } = require('../repositories/repositories');
 
 const { resumenStockPorArea, estadoStock, varianteLabel } = require('../models/models');
 const { hashPassword } = require('../database/seed');
 const { getDbPath } = require('../database/database');
+const importExportService = require('../services/importExportService');
 
 /* ──────────────────────────────────────────────────────────────────────
    CONTROLADOR: AUTENTICACIÓN
@@ -286,7 +287,9 @@ const empleadoController = {
   _validar(d) {
     if (!d.cedula || !d.cedula.trim()) return 'La cédula es obligatoria.';
     if (!d.nombre_completo || !d.nombre_completo.trim()) return 'El nombre completo es obligatorio.';
-    if (!d.fk_id_ubicacion) return 'Debe seleccionar una ubicación física de la carpeta.';
+    // El área es obligatoria (puede provenir del área directa o de un cargo).
+    if (!d.fk_id_area && !d.fk_id_cargo) return 'Debe seleccionar un área para el empleado.';
+    // La ubicación física es ahora texto libre y es opcional.
     if (!['Activo', 'Retirado'].includes(d.estado)) return 'El estado debe ser Activo o Retirado.';
     if (d.estado === 'Retirado' && !d.fecha_retiro) {
       return 'Debe indicar la fecha de retiro para un empleado retirado.';
@@ -406,6 +409,135 @@ const inventarioController = {
       return { ok: false, error: err.message };
     }
   },
+
+  /* ── ADMINISTRACIÓN DE DOTACIONES (CRUD) ─────────────────────────────── */
+
+  /** Valida que un valor sea un entero positivo (>= 0 opcional). */
+  _validarEntero(valor, { minimo = 1, etiqueta = 'La cantidad' } = {}) {
+    const n = Number(valor);
+    if (!Number.isInteger(n) || n < minimo) {
+      return `${etiqueta} debe ser un número entero ${minimo === 0 ? 'mayor o igual a 0' : 'positivo'}.`;
+    }
+    return null;
+  },
+
+  crearArticulo(data, idUsuario) {
+    try {
+      if (!data.nombre_item || !data.nombre_item.trim()) {
+        return { ok: false, error: 'El nombre de la dotación es obligatorio.' };
+      }
+      const errMin = this._validarEntero(data.stock_minimo, { minimo: 0, etiqueta: 'El stock mínimo' });
+      if (errMin) return { ok: false, error: errMin };
+      const r = articuloRepo.crearArticulo({
+        nombre_item: data.nombre_item.trim(),
+        stock_minimo: Number(data.stock_minimo),
+        vencimiento: data.vencimiento ? 1 : 0,
+        fk_id_area: data.fk_id_area || null,
+      });
+      actividadRepo.registrar({
+        accion: 'creacion', detalle: `Se creó la dotación "${data.nombre_item.trim()}"`,
+        entidad: 'articulo', fk_id_usuario: idUsuario || null,
+      });
+      return { ok: true, data: { id_articulo: r.lastInsertRowid } };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+
+  actualizarArticulo(id_articulo, data, idUsuario) {
+    try {
+      if (!data.nombre_item || !data.nombre_item.trim()) {
+        return { ok: false, error: 'El nombre de la dotación es obligatorio.' };
+      }
+      const errMin = this._validarEntero(data.stock_minimo, { minimo: 0, etiqueta: 'El stock mínimo' });
+      if (errMin) return { ok: false, error: errMin };
+      articuloRepo.actualizarArticulo(id_articulo, {
+        nombre_item: data.nombre_item.trim(),
+        stock_minimo: Number(data.stock_minimo),
+        vencimiento: data.vencimiento ? 1 : 0,
+        fk_id_area: data.fk_id_area || null,
+      });
+      actividadRepo.registrar({
+        accion: 'actualizacion', detalle: `Se actualizó la dotación "${data.nombre_item.trim()}"`,
+        entidad: 'articulo', fk_id_usuario: idUsuario || null,
+      });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+
+  eliminarArticulo(id_articulo, idUsuario) {
+    try {
+      articuloRepo.eliminarArticulo(id_articulo);
+      actividadRepo.registrar({
+        accion: 'eliminacion', detalle: `Se eliminó una dotación (#${id_articulo})`,
+        entidad: 'articulo', fk_id_usuario: idUsuario || null,
+      });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+
+  /**
+   * Crea o suma stock a una variante de talla de un artículo.
+   * data: { fk_id_articulo, camisa, pantalon, calzado, stock_actual }
+   */
+  crearVariante(data, idUsuario) {
+    try {
+      if (!data.fk_id_articulo) return { ok: false, error: 'Debe seleccionar una dotación.' };
+      if (!data.camisa && !data.pantalon && !data.calzado) {
+        return { ok: false, error: 'Debe indicar una talla para la variante.' };
+      }
+      const errStock = this._validarEntero(data.stock_actual, { minimo: 0, etiqueta: 'El stock' });
+      if (errStock) return { ok: false, error: errStock };
+      const id = articuloRepo.crearVariante({
+        fk_id_articulo: data.fk_id_articulo,
+        camisa: data.camisa || null,
+        pantalon: data.pantalon || null,
+        calzado: data.calzado || null,
+        stock_actual: Number(data.stock_actual),
+      });
+      actividadRepo.registrar({
+        accion: 'actualizacion', detalle: 'Se agregó/actualizó una variante de talla de dotación',
+        entidad: 'articulo', fk_id_usuario: idUsuario || null,
+      });
+      return { ok: true, data: { id_stock_variante: id } };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+
+  /** Ajusta (fija) el stock de una variante a un valor entero >= 0. */
+  ajustarStock({ id_stock_variante, stock_actual }, idUsuario) {
+    try {
+      if (!id_stock_variante) return { ok: false, error: 'Variante no válida.' };
+      const errStock = this._validarEntero(stock_actual, { minimo: 0, etiqueta: 'El stock' });
+      if (errStock) return { ok: false, error: errStock };
+      articuloRepo.ajustarStock(id_stock_variante, Number(stock_actual));
+      actividadRepo.registrar({
+        accion: 'actualizacion', detalle: `Ajuste de stock de variante (#${id_stock_variante}) a ${stock_actual}`,
+        entidad: 'articulo', fk_id_usuario: idUsuario || null,
+      });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+
+  eliminarVariante(id_stock_variante, idUsuario) {
+    try {
+      articuloRepo.eliminarVariante(id_stock_variante);
+      actividadRepo.registrar({
+        accion: 'eliminacion', detalle: `Se eliminó una variante de talla (#${id_stock_variante})`,
+        entidad: 'articulo', fk_id_usuario: idUsuario || null,
+      });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
 };
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -494,8 +626,13 @@ const usuarioController = {
 
   _validar(d, esNuevo) {
     if (!d.username || !d.username.trim()) return 'El nombre de usuario es obligatorio.';
-    if (!['Administrador', 'Auxiliar'].includes(d.rol)) return 'Debe seleccionar un rol válido.';
-    if (!d.fk_id_empleado) return 'Debe vincular el usuario a un empleado.';
+    // El rol se valida contra los roles dinámicos ACTIVOS de la tabla `rol`.
+    if (!d.rol || !d.rol.trim()) return 'Debe seleccionar un rol.';
+    const rolesValidos = rolRepo.listarActivos().map((r) => r.nombre);
+    if (!rolesValidos.includes(d.rol)) {
+      return 'El rol seleccionado no es válido o está desactivado.';
+    }
+    // La vinculación a un empleado es OPCIONAL (p. ej. el usuario "Programador").
     if (esNuevo && (!d.password || d.password.length < 4)) {
       return 'La contraseña es obligatoria (mínimo 4 caracteres).';
     }
@@ -616,6 +753,116 @@ const dbController = {
   },
 };
 
+/* ──────────────────────────────────────────────────────────────────────
+   CONTROLADOR: ROLES (administración dinámica de roles)
+─────────────────────────────────────────────────────────────────────── */
+const rolController = {
+  listar() {
+    try {
+      return { ok: true, data: rolRepo.listar() };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+
+  listarActivos() {
+    try {
+      return { ok: true, data: rolRepo.listarActivos() };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+
+  crear({ nombre, descripcion }, idUsuario) {
+    try {
+      if (!nombre || !nombre.trim()) return { ok: false, error: 'El nombre del rol es obligatorio.' };
+      const limpio = nombre.trim();
+      if (rolRepo.existeNombre(limpio)) {
+        return { ok: false, error: 'Ya existe un rol con ese nombre.' };
+      }
+      const r = rolRepo.crear({ nombre: limpio, descripcion: (descripcion || '').trim() || null });
+      actividadRepo.registrar({
+        accion: 'creacion', detalle: `Se creó el rol "${limpio}"`,
+        entidad: 'rol', fk_id_usuario: idUsuario || null,
+      });
+      return { ok: true, data: { id_rol: r.lastInsertRowid } };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+
+  actualizar(id_rol, { nombre, descripcion }, idUsuario) {
+    try {
+      if (!nombre || !nombre.trim()) return { ok: false, error: 'El nombre del rol es obligatorio.' };
+      const limpio = nombre.trim();
+      if (rolRepo.existeNombre(limpio, id_rol)) {
+        return { ok: false, error: 'Ya existe otro rol con ese nombre.' };
+      }
+      rolRepo.actualizar(id_rol, { nombre: limpio, descripcion: (descripcion || '').trim() || null });
+      actividadRepo.registrar({
+        accion: 'actualizacion', detalle: `Se actualizó el rol "${limpio}"`,
+        entidad: 'rol', fk_id_usuario: idUsuario || null,
+      });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+
+  cambiarEstado(id_rol, estado, idUsuario) {
+    try {
+      rolRepo.cambiarEstado(id_rol, estado);
+      actividadRepo.registrar({
+        accion: 'actualizacion',
+        detalle: `Rol ${estado === 'Activo' ? 'activado' : 'desactivado'} (#${id_rol})`,
+        entidad: 'rol', fk_id_usuario: idUsuario || null,
+      });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+};
+
+/* ──────────────────────────────────────────────────────────────────────
+   CONTROLADOR: IMPORTACIÓN / EXPORTACIÓN DE EMPLEADOS (Excel / CSV)
+   El acceso a diálogos del SO se gestiona en los manejadores IPC; aquí solo
+   se procesan rutas ya resueltas.
+─────────────────────────────────────────────────────────────────────── */
+const importExportController = {
+  /** Lee y valida un archivo (paso de previsualización, NO persiste nada). */
+  previsualizar(ruta) {
+    try {
+      if (!ruta) return { ok: false, error: 'Operación cancelada.' };
+      return importExportService.parsearArchivo(ruta);
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+
+  /** Confirma la importación de las filas válidas previamente revisadas. */
+  confirmar(filasValidas, idUsuario) {
+    try {
+      if (!Array.isArray(filasValidas) || !filasValidas.length) {
+        return { ok: false, error: 'No hay registros válidos para importar.' };
+      }
+      return importExportService.importarEmpleados(filasValidas, idUsuario || null);
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+
+  /** Exporta empleados (activos/retirados/todos) a Excel o CSV. */
+  exportar({ filtro = 'todos', formato = 'xlsx', rutaDestino }) {
+    try {
+      if (!rutaDestino) return { ok: false, error: 'Operación cancelada.' };
+      return importExportService.exportarEmpleados(filtro, formato, rutaDestino);
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  },
+};
+
 module.exports = {
   authController,
   dashboardController,
@@ -624,5 +871,7 @@ module.exports = {
   inventarioController,
   movimientoController,
   usuarioController,
+  rolController,
+  importExportController,
   dbController,
 };

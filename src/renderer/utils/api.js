@@ -16,6 +16,13 @@ import {
 
 const enElectron = typeof window !== 'undefined' && !!window.api;
 
+// Roles simulados para la vista previa en navegador
+const MOCK_ROLES = [
+  { id_rol: 1, nombre: 'Desarrollador', descripcion: 'Acceso total al sistema', estado: 'Activo' },
+  { id_rol: 2, nombre: 'Administrador', descripcion: 'Gestión de operaciones y catálogos', estado: 'Activo' },
+  { id_rol: 3, nombre: 'Operador', descripcion: 'Registro de entregas y consultas', estado: 'Activo' },
+];
+
 // Simula la latencia de IPC para el modo navegador
 const demora = (data, ms = 180) =>
   new Promise((resolve) => setTimeout(() => resolve(data), ms));
@@ -62,6 +69,24 @@ const mockApi = {
     listar: () => demora({ ok: true, data: MOCK_INVENTARIO }),
     resumen: () => demora({ ok: true, data: MOCK_DASHBOARD.stockPorArea }),
     variantes: () => demora({ ok: true, data: MOCK_VARIANTES }),
+    crearArticulo: () => demora({ ok: true, data: { id_articulo: 99 } }),
+    actualizarArticulo: () => demora({ ok: true }),
+    eliminarArticulo: () => demora({ ok: true }),
+    crearVariante: () => demora({ ok: true, data: { id_stock_variante: 99 } }),
+    ajustarStock: () => demora({ ok: true }),
+    eliminarVariante: () => demora({ ok: true }),
+  },
+  roles: {
+    listar: () => demora({ ok: true, data: MOCK_ROLES }),
+    listarActivos: () => demora({ ok: true, data: MOCK_ROLES.filter((r) => r.estado === 'Activo') }),
+    crear: () => demora({ ok: true, data: { id_rol: 99 } }),
+    actualizar: () => demora({ ok: true }),
+    cambiarEstado: () => demora({ ok: true }),
+  },
+  importExport: {
+    seleccionarArchivo: () => demora({ ok: false, error: 'La importación solo está disponible en la app de escritorio.' }),
+    confirmar: () => demora({ ok: false, error: 'La importación solo está disponible en la app de escritorio.' }),
+    exportar: () => demora({ ok: false, error: 'La exportación solo está disponible en la app de escritorio.' }),
   },
   movimientos: {
     listar: () => demora({ ok: true, data: MOCK_DASHBOARD.actividades }),

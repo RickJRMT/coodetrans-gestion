@@ -32,16 +32,16 @@ const ETIQUETA_ACCION = {
 /* ─── Tarjeta KPI ───────────────────────────────────────────────────── */
 function KpiCard({ Icon, label, valor, sub, color, bg }) {
   return (
-    <Card className="p-5 hover:shadow-card-hover transition-shadow">
+    <Card className="p-3.5 hover:shadow-card-hover transition-shadow">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium text-subtle mb-1">{label}</p>
-          <p className="text-3xl font-extrabold text-ink-dark leading-none">{valor}</p>
-          {sub && <p className="text-xs text-muted mt-2">{sub}</p>}
+          <p className="text-[11px] font-medium text-subtle mb-0.5">{label}</p>
+          <p className="text-2xl font-extrabold text-ink-dark leading-none">{valor}</p>
+          {sub && <p className="text-[11px] text-muted mt-1">{sub}</p>}
         </div>
-        <span className="grid place-items-center w-11 h-11 rounded-xl shrink-0"
+        <span className="grid place-items-center w-9 h-9 rounded-lg shrink-0"
           style={{ background: bg, color }}>
-          <Icon size={22} />
+          <Icon size={18} />
         </span>
       </div>
     </Card>
@@ -51,23 +51,23 @@ function KpiCard({ Icon, label, valor, sub, color, bg }) {
 /* ─── Tarjeta de stock por área ─────────────────────────────────────── */
 function StockAreaCard({ area, normal, bajo, critico, total }) {
   return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between mb-3">
+    <Card className="p-3">
+      <div className="flex items-center justify-between mb-2">
         <h4 className="text-sm font-semibold text-ink-dark truncate" title={area}>{area}</h4>
         <Badge tone="info">{total} ítems</Badge>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <div className="text-center py-2 rounded-lg bg-ok-light">
-          <p className="text-xl font-bold text-ok-dark">{normal}</p>
-          <p className="text-[10px] font-medium text-ok-dark/80 uppercase tracking-wide">Normal</p>
+        <div className="text-center py-1.5 rounded-lg bg-ok-light">
+          <p className="text-lg font-bold text-ok-dark leading-none">{normal}</p>
+          <p className="text-[10px] font-medium text-ok-dark/80 uppercase tracking-wide mt-0.5">Normal</p>
         </div>
-        <div className="text-center py-2 rounded-lg bg-warn-light">
-          <p className="text-xl font-bold text-warn">{bajo}</p>
-          <p className="text-[10px] font-medium text-warn/80 uppercase tracking-wide">Bajo</p>
+        <div className="text-center py-1.5 rounded-lg bg-warn-light">
+          <p className="text-lg font-bold text-warn leading-none">{bajo}</p>
+          <p className="text-[10px] font-medium text-warn/80 uppercase tracking-wide mt-0.5">Bajo</p>
         </div>
-        <div className="text-center py-2 rounded-lg bg-danger-light">
-          <p className="text-xl font-bold text-danger">{critico}</p>
-          <p className="text-[10px] font-medium text-danger/80 uppercase tracking-wide">Crítico</p>
+        <div className="text-center py-1.5 rounded-lg bg-danger-light">
+          <p className="text-lg font-bold text-danger leading-none">{critico}</p>
+          <p className="text-[10px] font-medium text-danger/80 uppercase tracking-wide mt-0.5">Crítico</p>
         </div>
       </div>
     </Card>
@@ -144,9 +144,9 @@ export default function DashboardPage() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* KPIs principales */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <KpiCard Icon={Users} label="Empleados Activos" valor={kpis.empleadosActivos}
           sub={`${kpis.empleadosRetirados} retirados`} color="#0052D4" bg="#E8F0FD" />
         <KpiCard Icon={FolderArchive} label="Carpetas Archivadas" valor={kpis.carpetasArchivadas}
@@ -159,13 +159,13 @@ export default function DashboardPage() {
 
       {/* Stock por área */}
       <div>
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-2">
           <Boxes size={18} className="text-primary" />
           <h2 className="text-sm font-bold text-ink-dark uppercase tracking-wide">
             Estado de Stock por Área
           </h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {Object.values(stockPorArea).map((s) => (
             <StockAreaCard key={s.area} {...s} />
           ))}
@@ -173,13 +173,13 @@ export default function DashboardPage() {
       </div>
 
       {/* Gráfico + actividad */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
         {/* Gráfico de barras */}
         <Card className="xl:col-span-2">
           <CardHeader title="Empleados Activos por Área" subtitle="Distribución actual del personal"
             icon={TrendingUp} />
-          <div className="p-5">
-            <ResponsiveContainer width="100%" height={300}>
+          <div className="p-4">
+            <ResponsiveContainer width="100%" height={240}>
               <BarChart data={datosGrafico} margin={{ top: 24, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                 <XAxis dataKey="nombre" tick={{ fontSize: 12, fill: '#64748B' }}
@@ -204,7 +204,7 @@ export default function DashboardPage() {
         {/* Feed de actividades recientes */}
         <Card className="flex flex-col">
           <CardHeader title="Actividad Reciente" subtitle="Últimos movimientos" icon={History} />
-          <div className="p-3 flex-1 overflow-y-auto max-h-[360px]">
+          <div className="p-3 flex-1 overflow-y-auto max-h-[300px]">
             {actividades.length === 0 ? (
               <p className="text-center text-muted text-sm py-8">Sin actividad registrada.</p>
             ) : (

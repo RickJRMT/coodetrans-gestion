@@ -12,11 +12,11 @@ import logo from '../assets/coodetransLogo.png';
  */
 
 const NAV_ITEMS = [
-  { to: '/dashboard',     label: 'Dashboard',            Icon: LayoutDashboard },
-  { to: '/carpetas',      label: 'Carpetas / Ubicaciones', Icon: FolderOpen     },
-  { to: '/inventario',    label: 'Inventario',           Icon: Package         },
-  { to: '/movimientos',   label: 'Movimientos',          Icon: History         },
-  { to: '/configuracion', label: 'Configuración',        Icon: Settings        },
+  { to: '/dashboard',     label: 'Dashboard',                  Icon: LayoutDashboard },
+  { to: '/carpetas',      label: 'Control de Carpetas Físicas', Icon: FolderOpen     },
+  { to: '/inventario',    label: 'Inventario General',         Icon: Package         },
+  { to: '/movimientos',   label: 'Historial de Movimientos',   Icon: History         },
+  { to: '/configuracion', label: 'Configuración',              Icon: Settings        },
 ];
 
 export default function Sidebar() {
@@ -50,11 +50,11 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Etiqueta de sección */}
-      <div className="px-4 pt-4 pb-1 h-[26px]">
+      {/* Etiqueta de sección — con más separación y sin recorte del texto */}
+      <div className="px-4 pt-5 pb-2 mt-1 h-[34px] flex items-center overflow-hidden">
         <span
-          className="text-white/30 text-[10px] font-bold tracking-[0.12em] uppercase
-            transition-opacity duration-200"
+          className="text-white/40 text-[10px] font-bold tracking-[0.14em] uppercase
+            whitespace-nowrap leading-none transition-opacity duration-200"
           style={{ opacity: expandida ? 1 : 0 }}
         >
           Módulos

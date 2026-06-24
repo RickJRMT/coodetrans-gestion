@@ -67,22 +67,133 @@ function initDatabase(userDataPath) {
 }
 
 /**
- * Aplica migraciones no destructivas sobre bases de datos existentes.
- * Agrega la columna `estado` a las tablas que la incorporaron en la Fase 2
- * (area, cargo, usuario) si todavía no existe.
+ * Aplica migraciones NO destructivas sobre bases de datos existentes para
+ * preservar los datos del usuario entre actualizaciones de la aplicación.
+ *
+ * Migraciones aplicadas:
+ *   - Columna `estado` en area/cargo/usuario (Fase 2).
+ *   - Columnas `ubicacion_fisica` (texto libre) y `fk_id_area` en empleado (v1.0.0).
+ *   - Relajación de NOT NULL en usuario.fk_id_empleado (usuario sin empleado).
+ *   - Relajación de NOT NULL en empleado.fk_id_ubicacion (ubicación como texto).
+ * La tabla `rol` se crea automáticamente vía schema.sql (CREATE TABLE IF NOT EXISTS).
  */
 function migrar(db) {
-  const tieneColumna = (tabla, columna) =>
-    db.prepare(`PRAGMA table_info(${tabla})`).all().some((c) => c.name === columna);
+  const columnas = (tabla) => db.prepare(`PRAGMA table_info(${tabla})`).all();
+  const tieneColumna = (tabla, columna) => columnas(tabla).some((c) => c.name === columna);
+  const esNotNull = (tabla, columna) => {
+    const c = columnas(tabla).find((x) => x.name === columna);
+    return c ? c.notnull === 1 : false;
+  };
 
-  const agregarEstado = (tabla) => {
+  // 1) Columna 'estado' en tablas de la Fase 2
+  ['area', 'cargo', 'usuario'].forEach((tabla) => {
     if (!tieneColumna(tabla, 'estado')) {
       db.exec(`ALTER TABLE ${tabla} ADD COLUMN estado TEXT NOT NULL DEFAULT 'Activo'`);
       console.log(`[BD] Migración: columna 'estado' agregada a ${tabla}.`);
     }
-  };
+  });
 
-  ['area', 'cargo', 'usuario'].forEach(agregarEstado);
+  // 2) Nuevas columnas en empleado (v1.0.0)
+  if (!tieneColumna('empleado', 'ubicacion_fisica')) {
+    db.exec('ALTER TABLE empleado ADD COLUMN ubicacion_fisica TEXT');
+    // Copiar el texto desde la antigua tabla ubicacion_fisica cuando exista vínculo
+    try {
+      db.exec(`
+        UPDATE empleado SET ubicacion_fisica = (
+          SELECT uf.ubicacion_fisica FROM ubicacion_fisica uf
+          WHERE uf.id_ubicacion = empleado.fk_id_ubicacion
+        ) WHERE fk_id_ubicacion IS NOT NULL`);
+    } catch (_) { /* ignorar si la tabla aún no existe */ }
+    console.log("[BD] Migración: columna 'ubicacion_fisica' agregada a empleado.");
+  }
+  if (!tieneColumna('empleado', 'fk_id_area')) {
+    db.exec('ALTER TABLE empleado ADD COLUMN fk_id_area INTEGER');
+    // Derivar el área desde el cargo cuando exista
+    try {
+      db.exec(`
+        UPDATE empleado SET fk_id_area = (
+          SELECT c.fk_id_area FROM cargo c WHERE c.id_cargo = empleado.fk_id_cargo
+        ) WHERE fk_id_cargo IS NOT NULL`);
+    } catch (_) { /* ignorar */ }
+    console.log("[BD] Migración: columna 'fk_id_area' agregada a empleado.");
+  }
+
+  // 3) Relajar NOT NULL en usuario.fk_id_empleado (reconstrucción de tabla)
+  if (esNotNull('usuario', 'fk_id_empleado')) {
+    db.pragma('foreign_keys = OFF');
+    db.transaction(() => {
+      db.exec('ALTER TABLE usuario RENAME TO _usuario_old');
+      db.exec(`
+        CREATE TABLE usuario (
+          id_usuario        INTEGER PRIMARY KEY AUTOINCREMENT,
+          username          TEXT NOT NULL UNIQUE,
+          rol               TEXT NOT NULL,
+          password          TEXT NOT NULL,
+          estado            TEXT NOT NULL DEFAULT 'Activo',
+          intentos_fallidos INTEGER NOT NULL DEFAULT 0,
+          ultimo_acceso     TEXT,
+          fk_id_empleado    INTEGER,
+          createdAt         TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+          updatedAt         TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+          FOREIGN KEY (fk_id_empleado) REFERENCES empleado (id_empleado)
+            ON DELETE SET NULL ON UPDATE CASCADE
+        )`);
+      db.exec(`
+        INSERT INTO usuario (id_usuario, username, rol, password, estado,
+          intentos_fallidos, ultimo_acceso, fk_id_empleado, createdAt, updatedAt)
+        SELECT id_usuario, username, rol, password, COALESCE(estado,'Activo'),
+          COALESCE(intentos_fallidos,0), ultimo_acceso, fk_id_empleado,
+          COALESCE(createdAt, datetime('now','localtime')),
+          COALESCE(updatedAt, datetime('now','localtime'))
+        FROM _usuario_old`);
+      db.exec('DROP TABLE _usuario_old');
+    })();
+    db.pragma('foreign_keys = ON');
+    console.log('[BD] Migración: usuario.fk_id_empleado ahora admite NULL.');
+  }
+
+  // 4) Relajar NOT NULL en empleado.fk_id_ubicacion (reconstrucción de tabla)
+  if (esNotNull('empleado', 'fk_id_ubicacion')) {
+    db.pragma('foreign_keys = OFF');
+    db.transaction(() => {
+      db.exec('ALTER TABLE empleado RENAME TO _empleado_old');
+      db.exec(`
+        CREATE TABLE empleado (
+          id_empleado      INTEGER PRIMARY KEY AUTOINCREMENT,
+          cedula           TEXT NOT NULL UNIQUE,
+          nombre_completo  TEXT NOT NULL,
+          genero           TEXT,
+          fecha_ingreso    TEXT,
+          fecha_retiro     TEXT,
+          estado           TEXT NOT NULL CHECK (estado IN ('Activo', 'Retirado')),
+          observaciones    TEXT,
+          ubicacion_fisica TEXT,
+          fk_id_area       INTEGER,
+          fk_id_cargo      INTEGER,
+          fk_id_ubicacion  INTEGER,
+          fk_id_talla      INTEGER,
+          createdAt        TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+          updatedAt        TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+          FOREIGN KEY (fk_id_area)      REFERENCES area (id_area)              ON DELETE SET NULL ON UPDATE CASCADE,
+          FOREIGN KEY (fk_id_cargo)     REFERENCES cargo (id_cargo)            ON DELETE SET NULL ON UPDATE CASCADE,
+          FOREIGN KEY (fk_id_ubicacion) REFERENCES ubicacion_fisica (id_ubicacion) ON DELETE SET NULL ON UPDATE CASCADE,
+          FOREIGN KEY (fk_id_talla)     REFERENCES talla (id_talla)            ON DELETE SET NULL ON UPDATE CASCADE
+        )`);
+      db.exec(`
+        INSERT INTO empleado (id_empleado, cedula, nombre_completo, genero,
+          fecha_ingreso, fecha_retiro, estado, observaciones, ubicacion_fisica,
+          fk_id_area, fk_id_cargo, fk_id_ubicacion, fk_id_talla, createdAt, updatedAt)
+        SELECT id_empleado, cedula, nombre_completo, genero, fecha_ingreso,
+          fecha_retiro, estado, observaciones, ubicacion_fisica, fk_id_area,
+          fk_id_cargo, fk_id_ubicacion, fk_id_talla,
+          COALESCE(createdAt, datetime('now','localtime')),
+          COALESCE(updatedAt, datetime('now','localtime'))
+        FROM _empleado_old`);
+      db.exec('DROP TABLE _empleado_old');
+    })();
+    db.pragma('foreign_keys = ON');
+    console.log('[BD] Migración: empleado.fk_id_ubicacion ahora admite NULL.');
+  }
 }
 
 /** Devuelve la ruta absoluta del archivo de base de datos activo. */

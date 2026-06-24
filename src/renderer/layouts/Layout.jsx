@@ -7,10 +7,10 @@ import { useAuth } from '../hooks/useAuth';
 /** Metadatos de cada pantalla (título y subtítulo de la barra superior). */
 const META = {
   '/dashboard':     { titulo: 'Dashboard', sub: 'Panel general de la operación' },
-  '/carpetas':      { titulo: 'Carpetas / Ubicaciones', sub: 'Control de hojas de vida físicas' },
-  '/inventario':    { titulo: 'Inventario', sub: 'Stock de dotación y elementos' },
-  '/movimientos':   { titulo: 'Movimientos', sub: 'Historial de actividad del sistema' },
-  '/configuracion': { titulo: 'Configuración', sub: 'Usuarios y estructura organizacional' },
+  '/carpetas':      { titulo: 'Control de Carpetas Físicas', sub: 'Hojas de vida y ubicación física de carpetas' },
+  '/inventario':    { titulo: 'Inventario General', sub: 'Administración de dotaciones y stock' },
+  '/movimientos':   { titulo: 'Historial de Movimientos', sub: 'Entregas de dotación y actividad del sistema' },
+  '/configuracion': { titulo: 'Configuración', sub: 'Usuarios, roles y estructura organizacional' },
 };
 
 export default function Layout() {

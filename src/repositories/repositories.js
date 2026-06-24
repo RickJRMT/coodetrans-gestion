@@ -195,19 +195,72 @@ const ubicacionRepo = {
 };
 
 /* ──────────────────────────────────────────────────────────────────────
+   REPOSITORIO: ROL (roles dinámicos administrables)
+─────────────────────────────────────────────────────────────────────── */
+const rolRepo = {
+  listar() {
+    return getDb().prepare('SELECT * FROM rol ORDER BY nombre ASC').all();
+  },
+  listarActivos() {
+    return getDb()
+      .prepare("SELECT * FROM rol WHERE estado = 'Activo' ORDER BY nombre ASC")
+      .all();
+  },
+  obtenerPorNombre(nombre) {
+    return getDb().prepare('SELECT * FROM rol WHERE nombre = ?').get(nombre);
+  },
+  existeNombre(nombre, idExcluir = 0) {
+    return getDb()
+      .prepare('SELECT COUNT(*) AS n FROM rol WHERE nombre = ? AND id_rol <> ?')
+      .get(nombre, idExcluir).n > 0;
+  },
+  contarUsuarios(nombreRol) {
+    return getDb()
+      .prepare('SELECT COUNT(*) AS n FROM usuario WHERE rol = ?')
+      .get(nombreRol).n;
+  },
+  crear({ nombre, descripcion = null }) {
+    return getDb()
+      .prepare('INSERT INTO rol (nombre, descripcion) VALUES (?, ?)')
+      .run(nombre, descripcion);
+  },
+  actualizar(id_rol, { nombre, descripcion = null }) {
+    return getDb()
+      .prepare(`
+        UPDATE rol SET nombre = ?, descripcion = ?,
+          updatedAt = datetime('now','localtime')
+        WHERE id_rol = ?`)
+      .run(nombre, descripcion, id_rol);
+  },
+  cambiarEstado(id_rol, estado) {
+    return getDb()
+      .prepare(`
+        UPDATE rol SET estado = ?, updatedAt = datetime('now','localtime')
+        WHERE id_rol = ?`)
+      .run(estado, id_rol);
+  },
+};
+
+/* ──────────────────────────────────────────────────────────────────────
    REPOSITORIO: EMPLEADO
 ─────────────────────────────────────────────────────────────────────── */
 const empleadoRepo = {
   listar() {
+    // El área se resuelve con COALESCE: primero el área directa del empleado
+    // (e.fk_id_area) y, si es NULL, el área derivada de su cargo. Esto corrige
+    // el bug de Área = NULL al importar empleados sin cargo asociado.
+    // `e.*` ya incluye la columna de texto libre `ubicacion_fisica`.
     return getDb()
       .prepare(`
-        SELECT e.*, c.nom_cargo, a.id_area, a.nom_area, uf.ubicacion_fisica,
+        SELECT e.*, c.nom_cargo,
+               COALESCE(ad.id_area, ac.id_area)   AS id_area,
+               COALESCE(ad.nom_area, ac.nom_area) AS nom_area,
                t.camisa, t.pantalon, t.calzado
         FROM empleado e
-        LEFT JOIN cargo c            ON c.id_cargo = e.fk_id_cargo
-        LEFT JOIN area a             ON a.id_area = c.fk_id_area
-        LEFT JOIN ubicacion_fisica uf ON uf.id_ubicacion = e.fk_id_ubicacion
-        LEFT JOIN talla t            ON t.id_talla = e.fk_id_talla
+        LEFT JOIN cargo c ON c.id_cargo = e.fk_id_cargo
+        LEFT JOIN area ad ON ad.id_area = e.fk_id_area
+        LEFT JOIN area ac ON ac.id_area = c.fk_id_area
+        LEFT JOIN talla t ON t.id_talla = e.fk_id_talla
         ORDER BY e.nombre_completo ASC`)
       .all();
   },
@@ -215,13 +268,15 @@ const empleadoRepo = {
   obtener(id_empleado) {
     return getDb()
       .prepare(`
-        SELECT e.*, c.nom_cargo, a.id_area, a.nom_area, uf.ubicacion_fisica,
+        SELECT e.*, c.nom_cargo,
+               COALESCE(ad.id_area, ac.id_area)   AS id_area,
+               COALESCE(ad.nom_area, ac.nom_area) AS nom_area,
                t.camisa, t.pantalon, t.calzado
         FROM empleado e
-        LEFT JOIN cargo c            ON c.id_cargo = e.fk_id_cargo
-        LEFT JOIN area a             ON a.id_area = c.fk_id_area
-        LEFT JOIN ubicacion_fisica uf ON uf.id_ubicacion = e.fk_id_ubicacion
-        LEFT JOIN talla t            ON t.id_talla = e.fk_id_talla
+        LEFT JOIN cargo c ON c.id_cargo = e.fk_id_cargo
+        LEFT JOIN area ad ON ad.id_area = e.fk_id_area
+        LEFT JOIN area ac ON ac.id_area = c.fk_id_area
+        LEFT JOIN talla t ON t.id_talla = e.fk_id_talla
         WHERE e.id_empleado = ?`)
       .get(id_empleado);
   },
@@ -250,12 +305,14 @@ const empleadoRepo = {
         .prepare(`
           INSERT INTO empleado
             (cedula, nombre_completo, genero, fecha_ingreso, fecha_retiro, estado,
-             observaciones, fk_id_cargo, fk_id_ubicacion, fk_id_talla)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+             observaciones, ubicacion_fisica, fk_id_area, fk_id_cargo,
+             fk_id_ubicacion, fk_id_talla)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(
           d.cedula, d.nombre_completo, d.genero || null, d.fecha_ingreso || null,
           d.fecha_retiro || null, d.estado, d.observaciones || null,
-          d.fk_id_cargo || null, d.fk_id_ubicacion, fk_id_talla
+          d.ubicacion_fisica || null, d.fk_id_area || null,
+          d.fk_id_cargo || null, d.fk_id_ubicacion || null, fk_id_talla
         );
       return res.lastInsertRowid;
     });
@@ -290,13 +347,15 @@ const empleadoRepo = {
       db.prepare(`
         UPDATE empleado SET
           cedula = ?, nombre_completo = ?, genero = ?, fecha_ingreso = ?,
-          fecha_retiro = ?, estado = ?, observaciones = ?, fk_id_cargo = ?,
-          fk_id_ubicacion = ?, fk_id_talla = ?, updatedAt = datetime('now','localtime')
+          fecha_retiro = ?, estado = ?, observaciones = ?, ubicacion_fisica = ?,
+          fk_id_area = ?, fk_id_cargo = ?, fk_id_ubicacion = ?, fk_id_talla = ?,
+          updatedAt = datetime('now','localtime')
         WHERE id_empleado = ?`)
         .run(
           d.cedula, d.nombre_completo, d.genero || null, d.fecha_ingreso || null,
           d.fecha_retiro || null, d.estado, d.observaciones || null,
-          d.fk_id_cargo || null, d.fk_id_ubicacion, fk_id_talla, id
+          d.ubicacion_fisica || null, d.fk_id_area || null,
+          d.fk_id_cargo || null, d.fk_id_ubicacion || null, fk_id_talla, id
         );
     });
     tx(id_empleado, data);
@@ -326,14 +385,19 @@ const empleadoRepo = {
       .get(estado).n;
   },
 
-  /** Cantidad de empleados activos agrupados por área. */
+  /**
+   * Cantidad de empleados activos agrupados por área. El área de cada empleado
+   * se resuelve por COALESCE (área directa o área del cargo), de modo que el
+   * conteo es correcto aunque el empleado no tenga cargo asignado.
+   */
   contarActivosPorArea() {
     return getDb()
       .prepare(`
         SELECT a.id_area, a.nom_area, COUNT(e.id_empleado) AS total
         FROM area a
-        LEFT JOIN cargo c    ON c.fk_id_area = a.id_area
-        LEFT JOIN empleado e ON e.fk_id_cargo = c.id_cargo AND e.estado = 'Activo'
+        LEFT JOIN empleado e
+          ON COALESCE(e.fk_id_area, (SELECT c.fk_id_area FROM cargo c WHERE c.id_cargo = e.fk_id_cargo)) = a.id_area
+         AND e.estado = 'Activo'
         GROUP BY a.id_area, a.nom_area
         ORDER BY a.id_area ASC`)
       .all();
@@ -389,6 +453,108 @@ const articuloRepo = {
             updatedAt = datetime('now','localtime')
         WHERE id_stock_variante = ?`)
       .run(cantidad, id_stock_variante);
+  },
+
+  /* ── CRUD de administración del inventario ───────────────────────────── */
+
+  obtener(id_articulo) {
+    return getDb()
+      .prepare(`
+        SELECT ar.*, a.nom_area
+        FROM articulo ar
+        LEFT JOIN area a ON a.id_area = ar.fk_id_area
+        WHERE ar.id_articulo = ?`)
+      .get(id_articulo);
+  },
+
+  /**
+   * Busca una talla existente con la combinación exacta camisa/pantalon/calzado
+   * o la crea si no existe. Devuelve el id_talla.
+   */
+  buscarOCrearTalla({ camisa = null, pantalon = null, calzado = null }) {
+    const db = getDb();
+    const existente = db
+      .prepare(`
+        SELECT id_talla FROM talla
+        WHERE IFNULL(camisa,'')   = IFNULL(?, '')
+          AND IFNULL(pantalon,'') = IFNULL(?, '')
+          AND IFNULL(calzado,'')  = IFNULL(?, '')`)
+      .get(camisa, pantalon, calzado);
+    if (existente) return existente.id_talla;
+    const r = db
+      .prepare('INSERT INTO talla (camisa, pantalon, calzado) VALUES (?, ?, ?)')
+      .run(camisa, pantalon, calzado);
+    return r.lastInsertRowid;
+  },
+
+  crearArticulo({ nombre_item, stock_minimo = 10, vencimiento = 0, fk_id_area = null }) {
+    return getDb()
+      .prepare(`
+        INSERT INTO articulo (nombre_item, stock_minimo, vencimiento, fk_id_area)
+        VALUES (?, ?, ?, ?)`)
+      .run(nombre_item, stock_minimo, vencimiento ? 1 : 0, fk_id_area || null);
+  },
+
+  actualizarArticulo(id_articulo, { nombre_item, stock_minimo, vencimiento, fk_id_area }) {
+    return getDb()
+      .prepare(`
+        UPDATE articulo SET
+          nombre_item = ?, stock_minimo = ?, vencimiento = ?, fk_id_area = ?,
+          updatedAt = datetime('now','localtime')
+        WHERE id_articulo = ?`)
+      .run(nombre_item, stock_minimo, vencimiento ? 1 : 0, fk_id_area || null, id_articulo);
+  },
+
+  eliminarArticulo(id_articulo) {
+    // Las variantes de stock se eliminan en cascada (ON DELETE CASCADE).
+    return getDb()
+      .prepare('DELETE FROM articulo WHERE id_articulo = ?')
+      .run(id_articulo);
+  },
+
+  /**
+   * Crea (o reactiva) una variante de talla para un artículo. Si ya existe la
+   * combinación artículo+talla, suma el stock indicado. Transaccional.
+   */
+  crearVariante({ fk_id_articulo, camisa = null, pantalon = null, calzado = null, stock_actual = 0 }) {
+    const db = getDb();
+    const tx = db.transaction(() => {
+      const fk_id_talla = this.buscarOCrearTalla({ camisa, pantalon, calzado });
+      const existente = db
+        .prepare('SELECT id_stock_variante FROM articulo_talla_stock WHERE fk_id_articulo = ? AND fk_id_talla = ?')
+        .get(fk_id_articulo, fk_id_talla);
+      if (existente) {
+        db.prepare(`
+          UPDATE articulo_talla_stock
+          SET stock_actual = stock_actual + ?, updatedAt = datetime('now','localtime')
+          WHERE id_stock_variante = ?`)
+          .run(stock_actual, existente.id_stock_variante);
+        return existente.id_stock_variante;
+      }
+      const r = db
+        .prepare(`
+          INSERT INTO articulo_talla_stock (fk_id_articulo, fk_id_talla, stock_actual)
+          VALUES (?, ?, ?)`)
+        .run(fk_id_articulo, fk_id_talla, stock_actual);
+      return r.lastInsertRowid;
+    });
+    return tx();
+  },
+
+  /** Ajusta (fija) el stock exacto de una variante a un valor entero >= 0. */
+  ajustarStock(id_stock_variante, stock_actual) {
+    return getDb()
+      .prepare(`
+        UPDATE articulo_talla_stock
+        SET stock_actual = ?, updatedAt = datetime('now','localtime')
+        WHERE id_stock_variante = ?`)
+      .run(stock_actual, id_stock_variante);
+  },
+
+  eliminarVariante(id_stock_variante) {
+    return getDb()
+      .prepare('DELETE FROM articulo_talla_stock WHERE id_stock_variante = ?')
+      .run(id_stock_variante);
   },
 };
 
@@ -515,6 +681,7 @@ const actividadRepo = {
 
 module.exports = {
   usuarioRepo,
+  rolRepo,
   areaRepo,
   cargoRepo,
   ubicacionRepo,

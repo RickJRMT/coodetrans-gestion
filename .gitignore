@@ -1,0 +1,123 @@
+# =====================================================
+# COODETRANS GESTIÓN
+# Electron + React + Vite + SQLite
+# =====================================================
+
+# =====================
+# Dependencias
+# =====================
+node_modules/
+
+# =====================
+# Builds
+# =====================
+dist/
+dist-renderer/
+release/
+out/
+
+# =====================
+# Vite
+# =====================
+.vite/
+
+# =====================
+# Logs
+# =====================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# =====================
+# Base de datos local
+# =====================
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Copias de seguridad generadas por usuarios
+backups/
+backup/
+exports/
+
+# =====================
+# Variables de entorno
+# =====================
+.env
+.env.*
+!.env.example
+
+# =====================
+# Electron Builder
+# =====================
+*.blockmap
+
+# Archivos generados por releases
+latest.yml
+latest-linux.yml
+latest-mac.yml
+
+# =====================
+# Certificados de firma
+# =====================
+*.p12
+*.pfx
+*.pem
+*.crt
+*.key
+
+# =====================
+# Archivos temporales
+# =====================
+tmp/
+temp/
+.cache/
+
+# =====================
+# Cobertura de pruebas
+# =====================
+coverage/
+
+# =====================
+# VS Code
+# =====================
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# =====================
+# JetBrains
+# =====================
+.idea/
+
+# =====================
+# Windows
+# =====================
+Thumbs.db
+Desktop.ini
+
+# =====================
+# MacOS
+# =====================
+.DS_Store
+
+# =====================
+# Linux
+# =====================
+*~
+
+# =====================
+# Secretos
+# =====================
+.github-token
+secrets.json
+
+# =====================
+# Electron Builder Env
+# =====================
+electron-builder.env

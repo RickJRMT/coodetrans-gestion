@@ -54,25 +54,46 @@ CREATE TABLE IF NOT EXISTS talla (
 -- ------------------------------------------------------------
 -- MÓDULO GESTIÓN DE PERSONAL Y SEGURIDAD
 -- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS empleado (
-    id_empleado     INTEGER PRIMARY KEY AUTOINCREMENT,
-    cedula          TEXT NOT NULL UNIQUE,
-    nombre_completo TEXT NOT NULL,
-    genero          TEXT,
-    fecha_ingreso   TEXT,
-    fecha_retiro    TEXT,
-    estado          TEXT NOT NULL CHECK (estado IN ('Activo', 'Retirado')),
-    observaciones   TEXT,
-    fk_id_cargo     INTEGER,
-    fk_id_ubicacion INTEGER NOT NULL,
-    fk_id_talla     INTEGER,
-    createdAt       TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-    updatedAt       TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-    FOREIGN KEY (fk_id_cargo)     REFERENCES cargo (id_cargo)            ON DELETE RESTRICT ON UPDATE CASCADE,
-    FOREIGN KEY (fk_id_ubicacion) REFERENCES ubicacion_fisica (id_ubicacion) ON DELETE RESTRICT ON UPDATE CASCADE,
-    FOREIGN KEY (fk_id_talla)     REFERENCES talla (id_talla)            ON DELETE RESTRICT ON UPDATE CASCADE
+-- Tabla de roles DINÁMICOS administrables por el usuario.
+CREATE TABLE IF NOT EXISTS rol (
+    id_rol      INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre      TEXT NOT NULL UNIQUE,
+    descripcion TEXT,
+    estado      TEXT NOT NULL DEFAULT 'Activo',   -- 'Activo' | 'Inactivo'
+    createdAt   TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    updatedAt   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
+-- NOTA: La ubicación física de la carpeta del empleado se almacena como
+-- TEXTO LIBRE en la columna `ubicacion_fisica` (ej: "Archivo Central -
+-- Estante A - Nivel 2"). La columna fk_id_ubicacion se conserva como
+-- opcional únicamente por compatibilidad histórica y puede ser NULL.
+-- El área del empleado se guarda directamente en `fk_id_area` para soportar
+-- importaciones donde llega el área pero no el cargo.
+CREATE TABLE IF NOT EXISTS empleado (
+    id_empleado      INTEGER PRIMARY KEY AUTOINCREMENT,
+    cedula           TEXT NOT NULL UNIQUE,
+    nombre_completo  TEXT NOT NULL,
+    genero           TEXT,
+    fecha_ingreso    TEXT,
+    fecha_retiro     TEXT,
+    estado           TEXT NOT NULL CHECK (estado IN ('Activo', 'Retirado')),
+    observaciones    TEXT,
+    ubicacion_fisica TEXT,                 -- Texto libre (reemplaza el selector)
+    fk_id_area       INTEGER,              -- Área directa (opcional)
+    fk_id_cargo      INTEGER,
+    fk_id_ubicacion  INTEGER,              -- Opcional / compatibilidad
+    fk_id_talla      INTEGER,
+    createdAt        TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    updatedAt        TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    FOREIGN KEY (fk_id_area)      REFERENCES area (id_area)              ON DELETE SET NULL ON UPDATE CASCADE,
+    FOREIGN KEY (fk_id_cargo)     REFERENCES cargo (id_cargo)            ON DELETE SET NULL ON UPDATE CASCADE,
+    FOREIGN KEY (fk_id_ubicacion) REFERENCES ubicacion_fisica (id_ubicacion) ON DELETE SET NULL ON UPDATE CASCADE,
+    FOREIGN KEY (fk_id_talla)     REFERENCES talla (id_talla)            ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- El usuario puede NO estar vinculado a un empleado (fk_id_empleado NULL),
+-- por ejemplo el usuario inicial "Programador".
 CREATE TABLE IF NOT EXISTS usuario (
     id_usuario        INTEGER PRIMARY KEY AUTOINCREMENT,
     username          TEXT NOT NULL UNIQUE,
@@ -81,11 +102,11 @@ CREATE TABLE IF NOT EXISTS usuario (
     estado            TEXT NOT NULL DEFAULT 'Activo',   -- 'Activo' | 'Inactivo'
     intentos_fallidos INTEGER NOT NULL DEFAULT 0,
     ultimo_acceso     TEXT,
-    fk_id_empleado    INTEGER NOT NULL,
+    fk_id_empleado    INTEGER,                          -- Opcional (puede ser NULL)
     createdAt         TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     updatedAt         TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     FOREIGN KEY (fk_id_empleado) REFERENCES empleado (id_empleado)
-        ON DELETE CASCADE ON UPDATE CASCADE
+        ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- ------------------------------------------------------------

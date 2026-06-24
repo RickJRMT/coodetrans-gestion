@@ -310,9 +310,9 @@ export default function MovimientosPage() {
                     </option>
                   ))}
                 </Select>
-                <Input type="number" min="1" label={i === 0 ? 'Cant.' : undefined}
+                <Input inputMode="numeric" min="1" label={i === 0 ? 'Cant.' : undefined}
                   className="w-20" value={it.cantidad}
-                  onChange={(e) => cambiarItem(i, 'cantidad', e.target.value)} />
+                  onChange={(e) => cambiarItem(i, 'cantidad', e.target.value.replace(/[^\d]/g, ''))} />
                 <button onClick={() => quitarItem(i)} disabled={items.length === 1}
                   title="Quitar"
                   className="grid place-items-center w-10 h-[42px] rounded-lg text-muted

@@ -17,6 +17,8 @@ const {
   inventarioController,
   movimientoController,
   usuarioController,
+  rolController,
+  importExportController,
   dbController,
 } = require('../controllers/controllers');
 
@@ -51,10 +53,53 @@ function registrarHandlersIPC() {
   ipcMain.handle('empleado:actualizar', (_e, { id, datos, idUsuario }) => empleadoController.actualizar(id, datos, idUsuario));
   ipcMain.handle('empleado:historial', (_e, id) => empleadoController.historial(id));
 
-  /* ── Inventario ── */
+  /* ── Inventario (consulta) ── */
   ipcMain.handle('inventario:listar', () => inventarioController.listar());
   ipcMain.handle('inventario:resumen', () => inventarioController.resumenPorArea());
   ipcMain.handle('inventario:variantes', () => inventarioController.listarVariantes());
+
+  /* ── Inventario (administración / CRUD de dotaciones) ── */
+  ipcMain.handle('inventario:crearArticulo', (_e, { datos, idUsuario }) => inventarioController.crearArticulo(datos, idUsuario));
+  ipcMain.handle('inventario:actualizarArticulo', (_e, { id, datos, idUsuario }) => inventarioController.actualizarArticulo(id, datos, idUsuario));
+  ipcMain.handle('inventario:eliminarArticulo', (_e, { id, idUsuario }) => inventarioController.eliminarArticulo(id, idUsuario));
+  ipcMain.handle('inventario:crearVariante', (_e, { datos, idUsuario }) => inventarioController.crearVariante(datos, idUsuario));
+  ipcMain.handle('inventario:ajustarStock', (_e, { datos, idUsuario }) => inventarioController.ajustarStock(datos, idUsuario));
+  ipcMain.handle('inventario:eliminarVariante', (_e, { id, idUsuario }) => inventarioController.eliminarVariante(id, idUsuario));
+
+  /* ── Roles dinámicos ── */
+  ipcMain.handle('rol:listar', () => rolController.listar());
+  ipcMain.handle('rol:listarActivos', () => rolController.listarActivos());
+  ipcMain.handle('rol:crear', (_e, { datos, idUsuario }) => rolController.crear(datos, idUsuario));
+  ipcMain.handle('rol:actualizar', (_e, { id, datos, idUsuario }) => rolController.actualizar(id, datos, idUsuario));
+  ipcMain.handle('rol:estado', (_e, { id, estado, idUsuario }) => rolController.cambiarEstado(id, estado, idUsuario));
+
+  /* ── Importación / Exportación de empleados (Excel / CSV) ── */
+  ipcMain.handle('import:seleccionar', async () => {
+    const win = BrowserWindow.getFocusedWindow();
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Seleccionar archivo de empleados',
+      properties: ['openFile'],
+      filters: [{ name: 'Excel / CSV', extensions: ['xlsx', 'xls', 'csv'] }],
+    });
+    if (canceled || !filePaths || !filePaths.length) return { ok: false, error: 'Operación cancelada.' };
+    return importExportController.previsualizar(filePaths[0]);
+  });
+
+  ipcMain.handle('import:confirmar', (_e, { filasValidas, idUsuario }) =>
+    importExportController.confirmar(filasValidas, idUsuario));
+
+  ipcMain.handle('export:empleados', async (_e, { filtro = 'todos', formato = 'xlsx' } = {}) => {
+    const win = BrowserWindow.getFocusedWindow();
+    const fecha = new Date().toISOString().slice(0, 10);
+    const ext = formato === 'csv' ? 'csv' : 'xlsx';
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Exportar empleados',
+      defaultPath: path.join(app.getPath('documents'), `empleados-${filtro}-${fecha}.${ext}`),
+      filters: [{ name: ext === 'csv' ? 'CSV' : 'Excel', extensions: [ext] }],
+    });
+    if (canceled || !filePath) return { ok: false, error: 'Operación cancelada.' };
+    return importExportController.exportar({ filtro, formato: ext, rutaDestino: filePath });
+  });
 
   /* ── Movimientos / entregas ── */
   ipcMain.handle('movimiento:listar', (_e, limite) => movimientoController.listar(limite));

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Search, Plus, Pencil, History, MapPin, AlertTriangle, RefreshCw,
-  FolderOpen, IdCard, Shirt,
+  FolderOpen, IdCard, Shirt, Upload, Download, FileSpreadsheet,
+  CheckCircle2, XCircle, FileDown,
 } from 'lucide-react';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
@@ -19,7 +20,7 @@ const FORM_VACIO = {
   cedula: '', nombre_completo: '', genero: 'Masculino', id_area: '',
   fk_id_cargo: '', camisa: '', pantalon: '', calzado: '',
   fecha_ingreso: '', fecha_retiro: '', estado: 'Activo',
-  fk_id_ubicacion: '', observaciones: '',
+  ubicacion_fisica: '', observaciones: '',
 };
 
 function fmt(iso) {
@@ -49,9 +50,22 @@ export default function CarpetasPage() {
   const [empleados, setEmpleados] = useState([]);
   const [areas, setAreas] = useState([]);
   const [cargos, setCargos] = useState([]);
-  const [ubicaciones, setUbicaciones] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+
+  // Importación de empleados (Excel / CSV)
+  const [importAbierto, setImportAbierto] = useState(false);
+  const [previa, setPrevia] = useState(null);        // resultado de la previsualización
+  const [importando, setImportando] = useState(false);
+  const [errorImport, setErrorImport] = useState('');
+  const [resultadoImport, setResultadoImport] = useState(null);
+
+  // Exportación de empleados
+  const [exportAbierto, setExportAbierto] = useState(false);
+  const [exportFiltro, setExportFiltro] = useState('activos');
+  const [exportFormato, setExportFormato] = useState('xlsx');
+  const [exportando, setExportando] = useState(false);
+  const [mensajeExport, setMensajeExport] = useState('');
 
   // Filtros
   const [busqueda, setBusqueda] = useState('');
@@ -74,16 +88,14 @@ export default function CarpetasPage() {
   const cargarDatos = async () => {
     setCargando(true);
     try {
-      const [emp, ar, ca, ub] = await Promise.all([
+      const [emp, ar, ca] = await Promise.all([
         api.empleados.listar(),
         api.catalogos.areasActivas(),
         api.catalogos.cargosActivos(),
-        api.catalogos.ubicaciones(),
       ]);
       if (emp.ok) setEmpleados(emp.data); else setError(emp.error);
       if (ar.ok) setAreas(ar.data);
       if (ca.ok) setCargos(ca.data);
-      if (ub.ok) setUbicaciones(ub.data);
     } catch {
       setError('Error de comunicación con la base de datos.');
     } finally {
@@ -126,7 +138,7 @@ export default function CarpetasPage() {
       fk_id_cargo: e.fk_id_cargo || '', camisa: e.camisa || '',
       pantalon: e.pantalon || '', calzado: e.calzado || '',
       fecha_ingreso: e.fecha_ingreso || '', fecha_retiro: e.fecha_retiro || '',
-      estado: e.estado || 'Activo', fk_id_ubicacion: e.fk_id_ubicacion || '',
+      estado: e.estado || 'Activo', ubicacion_fisica: e.ubicacion_fisica || '',
       observaciones: e.observaciones || '',
     });
     setErrorForm('');
@@ -146,7 +158,7 @@ export default function CarpetasPage() {
     setErrorForm('');
     if (!form.cedula.trim()) return setErrorForm('La cédula es obligatoria.');
     if (!form.nombre_completo.trim()) return setErrorForm('El nombre completo es obligatorio.');
-    if (!form.fk_id_ubicacion) return setErrorForm('Debe seleccionar una ubicación física.');
+    if (!form.id_area && !form.fk_id_cargo) return setErrorForm('Debe seleccionar un área.');
     if (form.estado === 'Retirado' && !form.fecha_retiro) {
       return setErrorForm('Indique la fecha de retiro para un empleado retirado.');
     }
@@ -154,11 +166,12 @@ export default function CarpetasPage() {
     try {
       const datos = {
         cedula: form.cedula, nombre_completo: form.nombre_completo,
-        genero: form.genero, fk_id_cargo: form.fk_id_cargo || null,
+        genero: form.genero, fk_id_area: form.id_area || null,
+        fk_id_cargo: form.fk_id_cargo || null,
         camisa: form.camisa, pantalon: form.pantalon, calzado: form.calzado,
         fecha_ingreso: form.fecha_ingreso || null,
         fecha_retiro: form.estado === 'Retirado' ? form.fecha_retiro : null,
-        estado: form.estado, fk_id_ubicacion: form.fk_id_ubicacion,
+        estado: form.estado, ubicacion_fisica: form.ubicacion_fisica.trim() || null,
         observaciones: form.observaciones,
       };
       const res = editando
@@ -186,6 +199,71 @@ export default function CarpetasPage() {
       setHistorial([]);
     } finally {
       setCargandoHist(false);
+    }
+  };
+
+  /* ── Importación desde Excel / CSV ── */
+  const abrirImportador = () => {
+    setPrevia(null);
+    setErrorImport('');
+    setResultadoImport(null);
+    setImportAbierto(true);
+  };
+
+  const seleccionarArchivo = async () => {
+    setErrorImport('');
+    setResultadoImport(null);
+    try {
+      const res = await api.importExport.seleccionarArchivo();
+      if (!res.ok) {
+        if (res.error && res.error !== 'Operación cancelada.') setErrorImport(res.error);
+        return; // cancelado por el usuario
+      }
+      // parsearArchivo devuelve los campos de la vista previa en el nivel superior
+      setPrevia({
+        formato: res.formato,
+        columnas: res.columnas || [],
+        filasValidas: res.filasValidas || [],
+        filasInvalidas: res.filasInvalidas || [],
+        total: res.total || 0,
+      });
+    } catch {
+      setErrorImport('No fue posible leer el archivo seleccionado.');
+    }
+  };
+
+  const confirmarImportacion = async () => {
+    if (!previa || !previa.filasValidas?.length) return;
+    setImportando(true);
+    setErrorImport('');
+    try {
+      const res = await api.importExport.confirmar(previa.filasValidas, idUsuario);
+      if (!res.ok) { setErrorImport(res.error); return; }
+      setResultadoImport(res.data);
+      setPrevia(null);
+      await cargarDatos();
+    } catch {
+      setErrorImport('Ocurrió un error durante la importación.');
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  /* ── Exportación a Excel / CSV ── */
+  const exportar = async () => {
+    setExportando(true);
+    setMensajeExport('');
+    try {
+      const res = await api.importExport.exportar(exportFiltro, exportFormato);
+      if (!res.ok) {
+        if (res.error && res.error !== 'Operación cancelada.') setMensajeExport(res.error);
+        return;
+      }
+      setMensajeExport(`Archivo exportado correctamente en:\n${res.data?.ruta || ''}`);
+    } catch {
+      setMensajeExport('No fue posible exportar el archivo.');
+    } finally {
+      setExportando(false);
     }
   };
 
@@ -222,6 +300,8 @@ export default function CarpetasPage() {
               <option value="">Todas las áreas</option>
               {areas.map((a) => <option key={a.id_area} value={a.id_area}>{a.nom_area}</option>)}
             </Select>
+            <Button variant="secondary" icon={Upload} onClick={abrirImportador}>Importar</Button>
+            <Button variant="secondary" icon={Download} onClick={() => { setMensajeExport(''); setExportAbierto(true); }}>Exportar</Button>
             <Button icon={Plus} onClick={abrirNuevo}>Nueva carpeta</Button>
           </div>
         </div>
@@ -354,13 +434,9 @@ export default function CarpetasPage() {
             onChange={(e) => cambiar('genero', e.target.value)}>
             {GENEROS.map((g) => <option key={g} value={g}>{g}</option>)}
           </Select>
-          <Select label="Ubicación física *" value={form.fk_id_ubicacion}
-            onChange={(e) => cambiar('fk_id_ubicacion', e.target.value)}>
-            <option value="">Seleccione...</option>
-            {ubicaciones.map((u) => (
-              <option key={u.id_ubicacion} value={u.id_ubicacion}>{u.ubicacion_fisica}</option>
-            ))}
-          </Select>
+          <Input label="Ubicación física" value={form.ubicacion_fisica}
+            onChange={(e) => cambiar('ubicacion_fisica', e.target.value)}
+            placeholder="Ej.: Archivador 3, Carpeta 12, Estante B..." />
           <Select label="Área" value={form.id_area}
             onChange={(e) => cambiar('id_area', e.target.value)}>
             <option value="">Seleccione...</option>
@@ -453,6 +529,160 @@ export default function CarpetasPage() {
             ))}
           </div>
         )}
+      </Modal>
+
+      {/* ── Modal: importar empleados (Excel / CSV) ── */}
+      <Modal
+        open={importAbierto}
+        onClose={() => setImportAbierto(false)}
+        title="Importar empleados desde Excel / CSV"
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setImportAbierto(false)} disabled={importando}>
+              Cerrar
+            </Button>
+            <Button onClick={confirmarImportacion}
+              disabled={importando || !previa || !previa.filasValidas?.length}
+              icon={importando ? RefreshCw : CheckCircle2}>
+              {importando ? 'Importando...' : `Confirmar importación${previa ? ` (${previa.filasValidas.length})` : ''}`}
+            </Button>
+          </>
+        }
+      >
+        {errorImport && (
+          <div className="mb-4 flex items-center gap-2 bg-danger-light text-danger text-sm rounded-lg px-3 py-2">
+            <AlertTriangle size={16} /> {errorImport}
+          </div>
+        )}
+
+        {/* Resultado de una importación finalizada */}
+        {resultadoImport ? (
+          <div className="text-center py-8">
+            <CheckCircle2 className="mx-auto mb-3 text-success" size={40} />
+            <p className="text-ink-dark font-semibold mb-1">Importación completada</p>
+            <p className="text-sm text-muted">
+              {resultadoImport.insertados} nuevo(s) · {resultadoImport.actualizados} actualizado(s)
+              {resultadoImport.errores?.length ? ` · ${resultadoImport.errores.length} con error` : ''}
+            </p>
+          </div>
+        ) : !previa ? (
+          /* Paso 1: seleccionar archivo */
+          <div className="text-center py-8">
+            <FileSpreadsheet className="mx-auto mb-3 text-primary" size={40} />
+            <p className="text-ink-dark font-medium mb-1">Seleccione un archivo de empleados</p>
+            <p className="text-sm text-muted mb-5">
+              Formatos admitidos: Excel (.xlsx, .xls) y CSV. Se detectan automáticamente
+              los formatos Tipo 1 y Tipo 2.
+            </p>
+            <Button icon={Upload} onClick={seleccionarArchivo}>Seleccionar archivo...</Button>
+          </div>
+        ) : (
+          /* Paso 2: vista previa y validación */
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge tone="info">Formato {previa.formato}</Badge>
+              <span className="inline-flex items-center gap-1 text-sm text-success">
+                <CheckCircle2 size={15} /> {previa.filasValidas.length} válido(s)
+              </span>
+              {previa.filasInvalidas.length > 0 && (
+                <span className="inline-flex items-center gap-1 text-sm text-danger">
+                  <XCircle size={15} /> {previa.filasInvalidas.length} con error
+                </span>
+              )}
+              <button onClick={seleccionarArchivo}
+                className="text-sm text-primary hover:underline ml-auto">Cambiar archivo</button>
+            </div>
+
+            {/* Tabla de filas válidas */}
+            {previa.filasValidas.length > 0 && (
+              <div className="border border-edge rounded-lg overflow-hidden">
+                <div className="px-3 py-2 bg-canvas/60 border-b border-edge text-xs font-semibold text-subtle uppercase tracking-wide">
+                  Registros a importar
+                </div>
+                <div className="max-h-[240px] overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-white">
+                      <tr className="border-b border-edge">
+                        {['Cédula', 'Nombre', 'Área', 'Cargo', 'Estado'].map((h) => (
+                          <th key={h} className="text-left font-semibold text-subtle text-xs px-3 py-2">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previa.filasValidas.map((f, i) => (
+                        <tr key={i} className="border-b border-edge/60 last:border-0">
+                          <td className="px-3 py-1.5 text-ink">{f.cedula}</td>
+                          <td className="px-3 py-1.5 text-ink">{f.nombre_completo}</td>
+                          <td className="px-3 py-1.5 text-muted">{f.area || '—'}</td>
+                          <td className="px-3 py-1.5 text-muted">{f.cargo || '—'}</td>
+                          <td className="px-3 py-1.5">
+                            <Badge tone={f.estado === 'Activo' ? 'ok' : 'neutral'}>{f.estado}</Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Filas inválidas */}
+            {previa.filasInvalidas.length > 0 && (
+              <div className="border border-danger/30 rounded-lg overflow-hidden">
+                <div className="px-3 py-2 bg-danger-light/60 border-b border-danger/20 text-xs font-semibold text-danger uppercase tracking-wide">
+                  Registros omitidos (no se importarán)
+                </div>
+                <div className="max-h-[160px] overflow-y-auto divide-y divide-edge/60">
+                  {previa.filasInvalidas.map((f, i) => (
+                    <div key={i} className="px-3 py-2 text-sm">
+                      <span className="text-ink">Fila {f.fila}: {f.nombre_completo || f.cedula || '(vacío)'}</span>
+                      <span className="text-danger text-xs block">{f.motivo}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Modal: exportar empleados ── */}
+      <Modal
+        open={exportAbierto}
+        onClose={() => setExportAbierto(false)}
+        title="Exportar empleados"
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setExportAbierto(false)} disabled={exportando}>
+              Cerrar
+            </Button>
+            <Button onClick={exportar} disabled={exportando}
+              icon={exportando ? RefreshCw : FileDown}>
+              {exportando ? 'Exportando...' : 'Exportar'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Select label="Empleados a exportar" value={exportFiltro}
+            onChange={(e) => setExportFiltro(e.target.value)}>
+            <option value="activos">Solo activos</option>
+            <option value="retirados">Solo retirados</option>
+            <option value="todos">Todos</option>
+          </Select>
+          <Select label="Formato de archivo" value={exportFormato}
+            onChange={(e) => setExportFormato(e.target.value)}>
+            <option value="xlsx">Excel (.xlsx)</option>
+            <option value="csv">CSV (.csv)</option>
+          </Select>
+          {mensajeExport && (
+            <div className="flex items-start gap-2 bg-primary-light text-primary text-sm rounded-lg px-3 py-2 whitespace-pre-line">
+              <CheckCircle2 size={16} className="mt-0.5 shrink-0" /> {mensajeExport}
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );

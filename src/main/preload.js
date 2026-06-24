@@ -45,11 +45,17 @@ contextBridge.exposeInMainWorld('api', {
     historial: (id) => invoke('empleado:historial', id),
   },
 
-  // Inventario
+  // Inventario (consulta + administración CRUD de dotaciones)
   inventario: {
     listar: () => invoke('inventario:listar'),
     resumen: () => invoke('inventario:resumen'),
     variantes: () => invoke('inventario:variantes'),
+    crearArticulo: (datos, idUsuario) => invoke('inventario:crearArticulo', { datos, idUsuario }),
+    actualizarArticulo: (id, datos, idUsuario) => invoke('inventario:actualizarArticulo', { id, datos, idUsuario }),
+    eliminarArticulo: (id, idUsuario) => invoke('inventario:eliminarArticulo', { id, idUsuario }),
+    crearVariante: (datos, idUsuario) => invoke('inventario:crearVariante', { datos, idUsuario }),
+    ajustarStock: (datos, idUsuario) => invoke('inventario:ajustarStock', { datos, idUsuario }),
+    eliminarVariante: (id, idUsuario) => invoke('inventario:eliminarVariante', { id, idUsuario }),
   },
 
   // Movimientos / entregas
@@ -66,6 +72,22 @@ contextBridge.exposeInMainWorld('api', {
     crear: (datos, idUsuario) => invoke('usuario:crear', { datos, idUsuario }),
     actualizar: (id, datos, idUsuario) => invoke('usuario:actualizar', { id, datos, idUsuario }),
     cambiarEstado: (id, estado, idUsuario) => invoke('usuario:estado', { id, estado, idUsuario }),
+  },
+
+  // Roles dinámicos
+  roles: {
+    listar: () => invoke('rol:listar'),
+    listarActivos: () => invoke('rol:listarActivos'),
+    crear: (datos, idUsuario) => invoke('rol:crear', { datos, idUsuario }),
+    actualizar: (id, datos, idUsuario) => invoke('rol:actualizar', { id, datos, idUsuario }),
+    cambiarEstado: (id, estado, idUsuario) => invoke('rol:estado', { id, estado, idUsuario }),
+  },
+
+  // Importación / Exportación de empleados (Excel / CSV)
+  importExport: {
+    seleccionarArchivo: () => invoke('import:seleccionar'),
+    confirmar: (filasValidas, idUsuario) => invoke('import:confirmar', { filasValidas, idUsuario }),
+    exportar: (filtro, formato) => invoke('export:empleados', { filtro, formato }),
   },
 
   // Base de datos (copia de seguridad / restauración)
