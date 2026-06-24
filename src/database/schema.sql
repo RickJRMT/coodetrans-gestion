@@ -181,5 +181,8 @@ CREATE TABLE IF NOT EXISTS actividad_reciente (
 -- ÍNDICES DE RENDIMIENTO PARA ACCESO ALFABÉTICO INMEDIATO
 -- ------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_empleado_nombre ON empleado (nombre_completo);
+CREATE INDEX IF NOT EXISTS idx_empleado_estado ON empleado (estado);
+CREATE INDEX IF NOT EXISTS idx_empleado_fk_area ON empleado (fk_id_area);
+CREATE INDEX IF NOT EXISTS idx_empleado_cedula ON empleado (cedula);
 CREATE INDEX IF NOT EXISTS idx_articulo_nombre ON articulo (nombre_item);
 CREATE INDEX IF NOT EXISTS idx_actividad_fecha ON actividad_reciente (fecha);

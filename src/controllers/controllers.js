@@ -14,7 +14,7 @@ const {
 
 const { resumenStockPorArea, estadoStock, varianteLabel } = require('../models/models');
 const { hashPassword } = require('../database/seed');
-const { getDbPath } = require('../database/database');
+const { getDbPath, getDb } = require('../database/database');
 const importExportService = require('../services/importExportService');
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -286,6 +286,7 @@ const empleadoController = {
   /** Valida y normaliza los datos del empleado antes de persistir. */
   _validar(d) {
     if (!d.cedula || !d.cedula.trim()) return 'La cédula es obligatoria.';
+    if (!/^\d+$/.test(d.cedula.trim())) return 'La cédula solo puede contener números.';
     if (!d.nombre_completo || !d.nombre_completo.trim()) return 'El nombre completo es obligatorio.';
     // El área es obligatoria (puede provenir del área directa o de un cargo).
     if (!d.fk_id_area && !d.fk_id_cargo) return 'Debe seleccionar un área para el empleado.';
@@ -733,6 +734,8 @@ const dbController = {
   backup(destino) {
     try {
       if (!destino) return { ok: false, error: 'Operación cancelada.' };
+      const db = getDb();
+      db.pragma('wal_checkpoint(TRUNCATE)');
       fs.copyFileSync(getDbPath(), destino);
       return { ok: true, data: { destino } };
     } catch (err) {
@@ -745,8 +748,13 @@ const dbController = {
     try {
       if (!origen) return { ok: false, error: 'Operación cancelada.' };
       if (!fs.existsSync(origen)) return { ok: false, error: 'El archivo seleccionado no existe.' };
-      fs.copyFileSync(origen, getDbPath());
-      return { ok: true, data: { origen } };
+
+      const { prepareForFileOperation } = require('../database/database');
+      const destino = prepareForFileOperation();
+      if (!destino) return { ok: false, error: 'No se pudo determinar la ruta de la base de datos.' };
+
+      fs.copyFileSync(origen, destino);
+      return { ok: true, data: { origen, destino } };
     } catch (err) {
       return { ok: false, error: err.message };
     }
@@ -831,10 +839,10 @@ const rolController = {
 ─────────────────────────────────────────────────────────────────────── */
 const importExportController = {
   /** Lee y valida un archivo (paso de previsualización, NO persiste nada). */
-  previsualizar(ruta) {
+  previsualizar(ruta, opciones = {}) {
     try {
       if (!ruta) return { ok: false, error: 'Operación cancelada.' };
-      return importExportService.parsearArchivo(ruta);
+      return importExportService.parsearArchivo(ruta, opciones);
     } catch (err) {
       return { ok: false, error: err.message };
     }

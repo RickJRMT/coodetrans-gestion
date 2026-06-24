@@ -1,18 +1,55 @@
 /**
  * main.js
  * Proceso principal de Electron.
- * - Crea la ventana de la aplicación.
- * - Inicializa la base de datos SQLite en la carpeta userData.
- * - Registra los manejadores IPC y carga el renderer (React/Vite).
  */
 
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { initDatabase, closeDatabase } = require('../database/database');
 const { registrarHandlersIPC } = require('./ipc-handlers');
 
-const isDev = process.env.NODE_ENV === 'development';
+const VITE_DEV_URL = 'http://localhost:5173';
+
+function esModoDesarrollo() {
+  if (app.isPackaged) return false;
+  return (
+    process.env.NODE_ENV === 'development' ||
+    process.argv.includes('--dev') ||
+    process.argv.includes('--relaunch-dev') ||
+    !fs.existsSync(path.join(__dirname, '../../dist-renderer/index.html'))
+  );
+}
+
+const isDev = esModoDesarrollo();
 let mainWindow = null;
+
+function cargarRenderer(win) {
+  if (isDev) {
+    let intentos = 0;
+    const maxIntentos = 12;
+
+    const intentarCarga = () => {
+      intentos += 1;
+      win.loadURL(VITE_DEV_URL).catch(() => {});
+    };
+
+    win.webContents.on('did-fail-load', (_event, errorCode, _desc, validatedURL) => {
+      if (validatedURL === VITE_DEV_URL && intentos < maxIntentos) {
+        setTimeout(intentarCarga, 800);
+      } else if (errorCode !== -3) {
+        console.error('[Main] Error cargando Vite:', errorCode);
+      }
+    });
+
+    intentarCarga();
+    if (process.env.NODE_ENV === 'development') {
+      win.webContents.openDevTools({ mode: 'detach' });
+    }
+  } else {
+    win.loadFile(path.join(__dirname, '../../dist-renderer/index.html'));
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -31,22 +68,37 @@ function createWindow() {
     },
   });
 
-  // Cargar el renderer: servidor de Vite en desarrollo, build estático en producción
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '../../dist-renderer/index.html'));
-  }
-
+  cargarRenderer(mainWindow);
   mainWindow.once('ready-to-show', () => mainWindow.show());
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+/**
+ * Tras restaurar la BD: en desarrollo recarga sin matar Vite;
+ * en producción reinicia el proceso completo.
+ */
+function reiniciarTrasRestauracionBD() {
+  const userData = app.getPath('userData');
+  initDatabase(userData);
+
+  if (isDev) {
+    const ventanas = BrowserWindow.getAllWindows();
+    if (ventanas.length) {
+      ventanas.forEach((w) => w.webContents.reload());
+    } else {
+      createWindow();
+    }
+    return { modo: 'recarga-suave' };
+  }
+
+  app.relaunch({ args: process.argv.slice(1).concat(['--relaunch-dev']) });
+  app.exit(0);
+  return { modo: 'reinicio-completo' };
+}
+
 app.whenReady().then(() => {
-  // Inicializar BD en userData antes de abrir la ventana
   initDatabase(app.getPath('userData'));
-  registrarHandlersIPC();
+  registrarHandlersIPC({ reiniciarTrasRestauracionBD });
   createWindow();
 
   app.on('activate', () => {
@@ -62,40 +114,4 @@ app.on('will-quit', () => {
   closeDatabase();
 });
 
-/* ──────────────────────────────────────────────────────────────────────
-   ACTUALIZACIONES AUTOMÁTICAS (electron-updater) — PLACEHOLDER
-   ─────────────────────────────────────────────────────────────────────
-   Para habilitar las actualizaciones automáticas vía GitHub Releases:
-
-   1) Instalar la dependencia:
-        npm install electron-updater
-
-   2) Configurar el "publish" en package.json (sección "build"):
-        "publish": [{
-          "provider": "github",
-          "owner": "TU_USUARIO_GITHUB",
-          "repo": "coodetrans-app"
-        }]
-
-   3) Publicar el instalador firmado en GitHub Releases:
-        - Generar un token de GitHub (GH_TOKEN) con permiso "repo".
-        - Ejecutar:  GH_TOKEN=xxxx npm run dist  (o el script de build:electron)
-        - electron-builder subirá los artefactos y el archivo latest.yml.
-
-   4) Descomentar el siguiente bloque para verificar e instalar
-      actualizaciones al iniciar la aplicación:
-
-   // const { autoUpdater } = require('electron-updater');
-   // autoUpdater.on('update-available', () => {
-   //   console.log('[Updater] Hay una actualización disponible, descargando...');
-   // });
-   // autoUpdater.on('update-downloaded', () => {
-   //   // Notificar al usuario y reiniciar para aplicar la actualización
-   //   autoUpdater.quitAndInstall();
-   // });
-   // autoUpdater.on('error', (err) => console.error('[Updater] Error:', err));
-   //
-   // app.whenReady().then(() => {
-   //   if (!isDev) autoUpdater.checkForUpdatesAndNotify();
-   // });
-─────────────────────────────────────────────────────────────────────── */
+module.exports = { reiniciarTrasRestauracionBD, esModoDesarrollo };

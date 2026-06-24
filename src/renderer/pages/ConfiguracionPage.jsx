@@ -506,7 +506,7 @@ function TabBaseDatos() {
     try {
       const r = await api.bd.restore();
       setMensaje(r.ok
-        ? { tipo: 'ok', texto: 'Base de datos restaurada. La aplicación se reiniciará...' }
+        ? { tipo: 'ok', texto: 'Base de datos restaurada. Recargando la aplicación...' }
         : { tipo: 'error', texto: r.error });
     } finally { setOcupado(false); }
   };

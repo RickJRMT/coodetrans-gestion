@@ -85,6 +85,7 @@ const mockApi = {
   },
   importExport: {
     seleccionarArchivo: () => demora({ ok: false, error: 'La importación solo está disponible en la app de escritorio.' }),
+    previsualizar: () => demora({ ok: false, error: 'La importación solo está disponible en la app de escritorio.' }),
     confirmar: () => demora({ ok: false, error: 'La importación solo está disponible en la app de escritorio.' }),
     exportar: () => demora({ ok: false, error: 'La exportación solo está disponible en la app de escritorio.' }),
   },

@@ -19,7 +19,7 @@ const usuarioRepo = {
         SELECT u.*, e.nombre_completo
         FROM usuario u
         LEFT JOIN empleado e ON e.id_empleado = u.fk_id_empleado
-        WHERE u.username = ?`)
+        WHERE u.username = ? COLLATE NOCASE`)
       .get(username);
   },
 
@@ -298,7 +298,11 @@ const empleadoRepo = {
       if (d.camisa || d.pantalon || d.calzado) {
         const r = db
           .prepare('INSERT INTO talla (camisa, pantalon, calzado) VALUES (?, ?, ?)')
-          .run(d.camisa || null, d.pantalon || null, d.calzado || null);
+          .run(
+            d.camisa ? String(d.camisa).toUpperCase() : null,
+            d.pantalon ? String(d.pantalon).toUpperCase() : null,
+            d.calzado ? String(d.calzado).toUpperCase() : null
+          );
         fk_id_talla = r.lastInsertRowid;
       }
       const res = db
@@ -335,11 +339,20 @@ const empleadoRepo = {
             UPDATE talla SET camisa = ?, pantalon = ?, calzado = ?,
               updatedAt = datetime('now','localtime')
             WHERE id_talla = ?`)
-            .run(d.camisa || null, d.pantalon || null, d.calzado || null, fk_id_talla);
+            .run(
+              d.camisa ? String(d.camisa).toUpperCase() : null,
+              d.pantalon ? String(d.pantalon).toUpperCase() : null,
+              d.calzado ? String(d.calzado).toUpperCase() : null,
+              fk_id_talla
+            );
         } else {
           const r = db
             .prepare('INSERT INTO talla (camisa, pantalon, calzado) VALUES (?, ?, ?)')
-            .run(d.camisa || null, d.pantalon || null, d.calzado || null);
+            .run(
+              d.camisa ? String(d.camisa).toUpperCase() : null,
+              d.pantalon ? String(d.pantalon).toUpperCase() : null,
+              d.calzado ? String(d.calzado).toUpperCase() : null
+            );
           fk_id_talla = r.lastInsertRowid;
         }
       }
@@ -386,20 +399,23 @@ const empleadoRepo = {
   },
 
   /**
-   * Cantidad de empleados activos agrupados por área. El área de cada empleado
-   * se resuelve por COALESCE (área directa o área del cargo), de modo que el
-   * conteo es correcto aunque el empleado no tenga cargo asignado.
+   * Empleados activos agrupados por área (desde empleado, no desde catálogo de áreas).
    */
   contarActivosPorArea() {
     return getDb()
       .prepare(`
-        SELECT a.id_area, a.nom_area, COUNT(e.id_empleado) AS total
-        FROM area a
-        LEFT JOIN empleado e
-          ON COALESCE(e.fk_id_area, (SELECT c.fk_id_area FROM cargo c WHERE c.id_cargo = e.fk_id_cargo)) = a.id_area
-         AND e.estado = 'Activo'
-        GROUP BY a.id_area, a.nom_area
-        ORDER BY a.id_area ASC`)
+        SELECT
+          COALESCE(ad.id_area, ac.id_area, 0) AS id_area,
+          COALESCE(ad.nom_area, ac.nom_area, 'Sin área asignada') AS nom_area,
+          COUNT(e.id_empleado) AS total
+        FROM empleado e
+        LEFT JOIN cargo c ON c.id_cargo = e.fk_id_cargo
+        LEFT JOIN area ad ON ad.id_area = e.fk_id_area
+        LEFT JOIN area ac ON ac.id_area = c.fk_id_area
+        WHERE e.estado = 'Activo'
+        GROUP BY COALESCE(ad.id_area, ac.id_area), COALESCE(ad.nom_area, ac.nom_area)
+        HAVING COUNT(e.id_empleado) > 0
+        ORDER BY nom_area ASC`)
       .all();
   },
 };

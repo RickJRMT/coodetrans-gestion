@@ -22,7 +22,7 @@ const {
   dbController,
 } = require('../controllers/controllers');
 
-function registrarHandlersIPC() {
+function registrarHandlersIPC({ reiniciarTrasRestauracionBD } = {}) {
   /* ── Autenticación ── */
   ipcMain.handle('auth:login', (_e, credenciales) => authController.login(credenciales));
 
@@ -84,6 +84,9 @@ function registrarHandlersIPC() {
     if (canceled || !filePaths || !filePaths.length) return { ok: false, error: 'Operación cancelada.' };
     return importExportController.previsualizar(filePaths[0]);
   });
+
+  ipcMain.handle('import:previsualizar', (_e, { ruta, hoja, todasLasHojas } = {}) =>
+    importExportController.previsualizar(ruta, { hoja, todasLasHojas }));
 
   ipcMain.handle('import:confirmar', (_e, { filasValidas, idUsuario }) =>
     importExportController.confirmar(filasValidas, idUsuario));
@@ -149,9 +152,9 @@ function registrarHandlersIPC() {
     if (confirm.response !== 1) return { ok: false, error: 'Operación cancelada.' };
 
     const res = dbController.restore(filePaths[0]);
-    if (res.ok) {
-      // Reiniciar la aplicación para recargar la base de datos restaurada
-      setTimeout(() => { app.relaunch(); app.exit(0); }, 600);
+    if (res.ok && typeof reiniciarTrasRestauracionBD === 'function') {
+      reiniciarTrasRestauracionBD();
+      return { ...res, data: { ...res.data, reinicio: 'ok' } };
     }
     return res;
   });

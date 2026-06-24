@@ -86,6 +86,7 @@ contextBridge.exposeInMainWorld('api', {
   // Importación / Exportación de empleados (Excel / CSV)
   importExport: {
     seleccionarArchivo: () => invoke('import:seleccionar'),
+    previsualizar: (ruta, opciones = {}) => invoke('import:previsualizar', { ruta, ...opciones }),
     confirmar: (filasValidas, idUsuario) => invoke('import:confirmar', { filasValidas, idUsuario }),
     exportar: (filtro, formato) => invoke('export:empleados', { filtro, formato }),
   },

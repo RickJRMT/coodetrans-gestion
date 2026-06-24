@@ -10,8 +10,13 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import Select from '../components/Select';
 import Modal from '../components/Modal';
+import EmpleadosTable from '../components/EmpleadosTable';
 import { api } from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import {
+  empleadoCoincideBusqueda, formatCedula, formatTalla, sanitizeCedula,
+} from '../utils/format';
 
 const GENEROS = ['Masculino', 'Femenino', 'Otro'];
 const ESTADOS = ['Activo', 'Retirado'];
@@ -55,7 +60,10 @@ export default function CarpetasPage() {
 
   // Importación de empleados (Excel / CSV)
   const [importAbierto, setImportAbierto] = useState(false);
-  const [previa, setPrevia] = useState(null);        // resultado de la previsualización
+  const [previa, setPrevia] = useState(null);
+  const [rutaImport, setRutaImport] = useState('');
+  const [hojaImport, setHojaImport] = useState('');
+  const [importarTodasHojas, setImportarTodasHojas] = useState(false);
   const [importando, setImportando] = useState(false);
   const [errorImport, setErrorImport] = useState('');
   const [resultadoImport, setResultadoImport] = useState(null);
@@ -69,6 +77,7 @@ export default function CarpetasPage() {
 
   // Filtros
   const [busqueda, setBusqueda] = useState('');
+  const busquedaDebounced = useDebouncedValue(busqueda, 180);
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroArea, setFiltroArea] = useState('');
 
@@ -105,16 +114,16 @@ export default function CarpetasPage() {
 
   useEffect(() => { cargarDatos(); }, []);
 
-  /* ── Filtrado en memoria ── */
+  /* ── Filtrado en memoria (búsqueda global con debounce) ── */
   const filtrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
+    const q = busquedaDebounced.trim();
     return empleados.filter((e) => {
       if (filtroEstado && e.estado !== filtroEstado) return false;
       if (filtroArea && String(e.id_area) !== String(filtroArea)) return false;
-      if (q && !(`${e.nombre_completo} ${e.cedula}`.toLowerCase().includes(q))) return false;
+      if (!empleadoCoincideBusqueda(e, q)) return false;
       return true;
     });
-  }, [empleados, busqueda, filtroEstado, filtroArea]);
+  }, [empleados, busquedaDebounced, filtroEstado, filtroArea]);
 
   // Cargos disponibles según el área seleccionada en el formulario
   const cargosForm = useMemo(
@@ -147,8 +156,10 @@ export default function CarpetasPage() {
 
   const cambiar = (campo, valor) => {
     setForm((f) => {
-      const next = { ...f, [campo]: valor };
-      // Al cambiar de área, reiniciar el cargo
+      let v = valor;
+      if (campo === 'cedula') v = sanitizeCedula(valor);
+      if (['camisa', 'pantalon', 'calzado'].includes(campo)) v = formatTalla(valor);
+      const next = { ...f, [campo]: v };
       if (campo === 'id_area') next.fk_id_cargo = '';
       return next;
     });
@@ -157,6 +168,7 @@ export default function CarpetasPage() {
   const guardar = async () => {
     setErrorForm('');
     if (!form.cedula.trim()) return setErrorForm('La cédula es obligatoria.');
+    if (!/^\d+$/.test(form.cedula.trim())) return setErrorForm('La cédula solo puede contener números.');
     if (!form.nombre_completo.trim()) return setErrorForm('El nombre completo es obligatorio.');
     if (!form.id_area && !form.fk_id_cargo) return setErrorForm('Debe seleccionar un área.');
     if (form.estado === 'Retirado' && !form.fecha_retiro) {
@@ -205,9 +217,33 @@ export default function CarpetasPage() {
   /* ── Importación desde Excel / CSV ── */
   const abrirImportador = () => {
     setPrevia(null);
+    setRutaImport('');
+    setHojaImport('');
+    setImportarTodasHojas(false);
     setErrorImport('');
     setResultadoImport(null);
     setImportAbierto(true);
+  };
+
+  const aplicarPrevia = (res) => {
+    if (!res.ok) {
+      if (res.error && res.error !== 'Operación cancelada.') setErrorImport(res.error);
+      return;
+    }
+    setRutaImport(res.rutaArchivo || '');
+    setHojaImport(res.hojaActiva || '');
+    setPrevia({
+      formato: res.formato,
+      columnas: res.columnas || [],
+      filaEncabezado: res.filaEncabezado,
+      filasValidas: res.filasValidas || [],
+      filasInvalidas: res.filasInvalidas || [],
+      total: res.total || 0,
+      multiHoja: res.multiHoja,
+      hojas: res.hojas || [],
+      hojaActiva: res.hojaActiva,
+      resumenMultiHoja: res.resumenMultiHoja || null,
+    });
   };
 
   const seleccionarArchivo = async () => {
@@ -217,18 +253,25 @@ export default function CarpetasPage() {
       const res = await api.importExport.seleccionarArchivo();
       if (!res.ok) {
         if (res.error && res.error !== 'Operación cancelada.') setErrorImport(res.error);
-        return; // cancelado por el usuario
+        return;
       }
-      // parsearArchivo devuelve los campos de la vista previa en el nivel superior
-      setPrevia({
-        formato: res.formato,
-        columnas: res.columnas || [],
-        filasValidas: res.filasValidas || [],
-        filasInvalidas: res.filasInvalidas || [],
-        total: res.total || 0,
-      });
+      aplicarPrevia(res);
     } catch {
       setErrorImport('No fue posible leer el archivo seleccionado.');
+    }
+  };
+
+  const cambiarHojaImport = async (opciones) => {
+    if (!rutaImport) return;
+    setErrorImport('');
+    setImportando(true);
+    try {
+      const res = await api.importExport.previsualizar(rutaImport, opciones);
+      aplicarPrevia(res);
+    } catch {
+      setErrorImport('No fue posible procesar la hoja seleccionada.');
+    } finally {
+      setImportando(false);
     }
   };
 
@@ -284,7 +327,7 @@ export default function CarpetasPage() {
           <div className="flex-1">
             <Input
               icon={Search}
-              placeholder="Buscar por nombre o cédula..."
+              placeholder="Buscar por nombre, cédula, ubicación u observaciones..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
             />
@@ -310,63 +353,13 @@ export default function CarpetasPage() {
         </p>
       </Card>
 
-      {/* Tabla (escritorio) */}
-      <Card className="hidden md:block overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-edge bg-canvas/50">
-                {['Empleado', 'Cédula', 'Área / Cargo', 'Ubicación', 'Estado', 'Acciones'].map((h) => (
-                  <th key={h} className="text-left font-semibold text-subtle text-xs uppercase
-                    tracking-wide px-4 py-3 whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtrados.length === 0 ? (
-                <tr><td colSpan={6} className="text-center text-muted py-10">
-                  No se encontraron carpetas con los filtros aplicados.
-                </td></tr>
-              ) : filtrados.map((e) => (
-                <tr key={e.id_empleado} className="border-b border-edge/70 last:border-0
-                  hover:bg-canvas/60 transition-colors">
-                  <td className="px-4 py-3">
-                    <p className="font-semibold text-ink-dark">{e.nombre_completo}</p>
-                    <p className="text-xs text-muted">{e.genero || '—'}</p>
-                  </td>
-                  <td className="px-4 py-3 text-ink">{e.cedula}</td>
-                  <td className="px-4 py-3">
-                    <p className="text-ink">{e.nom_area || '—'}</p>
-                    <p className="text-xs text-muted">{e.nom_cargo || 'Sin cargo'}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1 text-ink">
-                      <MapPin size={14} className="text-muted" />
-                      {e.ubicacion_fisica || '—'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge tone={e.estado === 'Activo' ? 'ok' : 'neutral'} dot>{e.estado}</Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => abrirHistorial(e)} title="Ver historial de dotación"
-                        className="grid place-items-center w-8 h-8 rounded-lg text-subtle
-                          hover:bg-primary-light hover:text-primary transition-colors">
-                        <History size={16} />
-                      </button>
-                      <button onClick={() => abrirEditar(e)} title="Editar carpeta"
-                        className="grid place-items-center w-8 h-8 rounded-lg text-subtle
-                          hover:bg-primary-light hover:text-primary transition-colors">
-                        <Pencil size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Tabla (escritorio) con scroll interno y virtualización */}
+      <Card className="hidden md:block overflow-hidden p-0">
+        <EmpleadosTable
+          items={filtrados}
+          onEdit={abrirEditar}
+          onHistory={abrirHistorial}
+        />
       </Card>
 
       {/* Tarjetas (móvil) */}
@@ -381,7 +374,7 @@ export default function CarpetasPage() {
               <div className="min-w-0">
                 <p className="font-semibold text-ink-dark truncate">{e.nombre_completo}</p>
                 <p className="text-xs text-muted flex items-center gap-1">
-                  <IdCard size={13} /> {e.cedula}
+                  <IdCard size={13} /> {formatCedula(e.cedula)}
                 </p>
               </div>
               <Badge tone={e.estado === 'Activo' ? 'ok' : 'neutral'} dot>{e.estado}</Badge>
@@ -391,6 +384,9 @@ export default function CarpetasPage() {
               <p className="flex items-center gap-1 text-muted text-xs">
                 <MapPin size={13} /> {e.ubicacion_fisica || '—'}
               </p>
+              {e.observaciones && (
+                <p className="text-xs text-subtle line-clamp-2">{e.observaciones}</p>
+              )}
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="secondary" icon={History}
@@ -426,8 +422,9 @@ export default function CarpetasPage() {
           </div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input label="Cédula *" value={form.cedula}
-            onChange={(e) => cambiar('cedula', e.target.value)} />
+          <Input label="Cédula *" value={form.cedula} inputMode="numeric"
+            onChange={(e) => cambiar('cedula', e.target.value)}
+            placeholder="Solo números" />
           <Input label="Nombre completo *" value={form.nombre_completo}
             onChange={(e) => cambiar('nombre_completo', e.target.value)} />
           <Select label="Género" value={form.genero}
@@ -558,12 +555,36 @@ export default function CarpetasPage() {
 
         {/* Resultado de una importación finalizada */}
         {resultadoImport ? (
-          <div className="text-center py-8">
-            <CheckCircle2 className="mx-auto mb-3 text-success" size={40} />
-            <p className="text-ink-dark font-semibold mb-1">Importación completada</p>
-            <p className="text-sm text-muted">
+          <div className="py-6 space-y-3">
+            <div className="text-center">
+              <CheckCircle2 className="mx-auto mb-3 text-success" size={40} />
+              <p className="text-ink-dark font-semibold mb-1">Importación completada</p>
+            </div>
+            {resultadoImport.resumen && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-sm">
+                <div className="p-2 bg-canvas rounded-lg">
+                  <p className="font-bold text-ink">{resultadoImport.resumen.registrosRecibidos}</p>
+                  <p className="text-xs text-muted">Recibidos</p>
+                </div>
+                <div className="p-2 bg-canvas rounded-lg">
+                  <p className="font-bold text-success">{resultadoImport.resumen.registrosImportados}</p>
+                  <p className="text-xs text-muted">Importados</p>
+                </div>
+                <div className="p-2 bg-canvas rounded-lg">
+                  <p className="font-bold text-primary">{resultadoImport.resumen.insertados}</p>
+                  <p className="text-xs text-muted">Nuevos</p>
+                </div>
+                <div className="p-2 bg-canvas rounded-lg">
+                  <p className="font-bold text-ink">{resultadoImport.resumen.actualizados}</p>
+                  <p className="text-xs text-muted">Actualizados</p>
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-muted text-center">
               {resultadoImport.insertados} nuevo(s) · {resultadoImport.actualizados} actualizado(s)
-              {resultadoImport.errores?.length ? ` · ${resultadoImport.errores.length} con error` : ''}
+              {(resultadoImport.omitidos?.length || resultadoImport.errores?.length)
+                ? ` · ${(resultadoImport.omitidos?.length || 0) + (resultadoImport.errores?.length || 0)} omitido(s)`
+                : ''}
             </p>
           </div>
         ) : !previa ? (
@@ -573,7 +594,7 @@ export default function CarpetasPage() {
             <p className="text-ink-dark font-medium mb-1">Seleccione un archivo de empleados</p>
             <p className="text-sm text-muted mb-5">
               Formatos admitidos: Excel (.xlsx, .xls) y CSV. Se detectan automáticamente
-              los formatos Tipo 1 y Tipo 2.
+              encabezados aunque existan títulos previos y se soportan archivos multi-hoja.
             </p>
             <Button icon={Upload} onClick={seleccionarArchivo}>Seleccionar archivo...</Button>
           </div>
@@ -582,6 +603,9 @@ export default function CarpetasPage() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
               <Badge tone="info">Formato {previa.formato}</Badge>
+              {previa.filaEncabezado && (
+                <span className="text-xs text-muted">Encabezado detectado en fila {previa.filaEncabezado}</span>
+              )}
               <span className="inline-flex items-center gap-1 text-sm text-success">
                 <CheckCircle2 size={15} /> {previa.filasValidas.length} válido(s)
               </span>
@@ -590,9 +614,66 @@ export default function CarpetasPage() {
                   <XCircle size={15} /> {previa.filasInvalidas.length} con error
                 </span>
               )}
-              <button onClick={seleccionarArchivo}
+              <button type="button" onClick={seleccionarArchivo}
                 className="text-sm text-primary hover:underline ml-auto">Cambiar archivo</button>
             </div>
+
+            {previa.resumenMultiHoja && (
+              <div className="p-3 bg-primary-light/40 rounded-lg border border-primary/20 text-sm space-y-2">
+                <p className="font-semibold text-primary-dark">Resumen multi-hoja</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                  <span>{previa.resumenMultiHoja.hojasProcesadas} / {previa.resumenMultiHoja.totalHojasArchivo} hojas procesadas</span>
+                  <span>{previa.resumenMultiHoja.registrosValidosEncontrados} registros válidos encontrados</span>
+                  <span>{previa.resumenMultiHoja.registrosUnicosAImportar} únicos a importar</span>
+                </div>
+                {previa.resumenMultiHoja.duplicadosConsolidados > 0 && (
+                  <p className="text-xs text-muted">
+                    {previa.resumenMultiHoja.duplicadosConsolidados} cédula(s) duplicada(s) entre hojas (se conserva la última aparición).
+                  </p>
+                )}
+                <div className="max-h-[120px] overflow-y-auto divide-y divide-edge/50">
+                  {previa.resumenMultiHoja.detalleHojas.map((h) => (
+                    <div key={h.nombre} className="py-1 flex justify-between gap-2">
+                      <span className="font-medium truncate">{h.nombre}</span>
+                      <span className="text-muted shrink-0">
+                        {h.validas} válidos · {h.invalidas} omitidos
+                        {!h.procesada && h.error ? ` · ${h.error}` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {previa.multiHoja && previa.hojas?.length > 1 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-canvas/60 rounded-lg border border-edge">
+                <Select
+                  label="Hoja de Excel"
+                  value={importarTodasHojas ? '__todas__' : hojaImport}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '__todas__') {
+                      setImportarTodasHojas(true);
+                      cambiarHojaImport({ todasLasHojas: true });
+                    } else {
+                      setImportarTodasHojas(false);
+                      setHojaImport(val);
+                      cambiarHojaImport({ hoja: val });
+                    }
+                  }}
+                >
+                  {previa.hojas.map((h) => (
+                    <option key={h.nombre} value={h.nombre}>
+                      {h.nombre} ({h.totalValidas} válidos)
+                    </option>
+                  ))}
+                  <option value="__todas__">Importar todas las hojas válidas</option>
+                </Select>
+                <p className="text-xs text-muted self-end pb-2">
+                  {previa.hojas.length} hoja(s) con tablas detectadas en el archivo.
+                </p>
+              </div>
+            )}
 
             {/* Tabla de filas válidas */}
             {previa.filasValidas.length > 0 && (
@@ -604,7 +685,7 @@ export default function CarpetasPage() {
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-white">
                       <tr className="border-b border-edge">
-                        {['Cédula', 'Nombre', 'Área', 'Cargo', 'Estado'].map((h) => (
+                        {['Cédula', 'Nombre', 'Área', 'Ubicación', 'Observaciones', 'Estado'].map((h) => (
                           <th key={h} className="text-left font-semibold text-subtle text-xs px-3 py-2">{h}</th>
                         ))}
                       </tr>
@@ -612,10 +693,11 @@ export default function CarpetasPage() {
                     <tbody>
                       {previa.filasValidas.map((f, i) => (
                         <tr key={i} className="border-b border-edge/60 last:border-0">
-                          <td className="px-3 py-1.5 text-ink">{f.cedula}</td>
+                          <td className="px-3 py-1.5 text-ink">{formatCedula(f.cedula)}</td>
                           <td className="px-3 py-1.5 text-ink">{f.nombre_completo}</td>
                           <td className="px-3 py-1.5 text-muted">{f.area || '—'}</td>
-                          <td className="px-3 py-1.5 text-muted">{f.cargo || '—'}</td>
+                          <td className="px-3 py-1.5 text-muted">{f.ubicacion_fisica || '—'}</td>
+                          <td className="px-3 py-1.5 text-muted">{f.observaciones || '—'}</td>
                           <td className="px-3 py-1.5">
                             <Badge tone={f.estado === 'Activo' ? 'ok' : 'neutral'}>{f.estado}</Badge>
                           </td>

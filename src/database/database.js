@@ -14,6 +14,7 @@ const fs = require('fs');
 const Database = require('better-sqlite3');
 
 let db = null;
+let storedDbPath = null;
 
 /**
  * Resuelve la ruta del archivo schema.sql tanto en desarrollo como
@@ -45,11 +46,15 @@ function initDatabase(userDataPath) {
   }
 
   const dbPath = path.join(userDataPath, 'coodetrans.db');
+  storedDbPath = dbPath;
   db = new Database(dbPath);
 
   // Configuración de rendimiento y consistencia
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+  db.pragma('synchronous = NORMAL');
+  db.pragma('cache_size = -64000');
+  db.pragma('temp_store = MEMORY');
 
   // Crear esquema si no existe
   const schema = fs.readFileSync(resolveSchemaPath(), 'utf-8');
@@ -194,11 +199,43 @@ function migrar(db) {
     db.pragma('foreign_keys = ON');
     console.log('[BD] Migración: empleado.fk_id_ubicacion ahora admite NULL.');
   }
+
+  // 5) Índices para consultas frecuentes sobre empleados
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_empleado_estado ON empleado(estado);
+    CREATE INDEX IF NOT EXISTS idx_empleado_fk_area ON empleado(fk_id_area);
+    CREATE INDEX IF NOT EXISTS idx_empleado_nombre ON empleado(nombre_completo);
+    CREATE INDEX IF NOT EXISTS idx_empleado_cedula ON empleado(cedula);
+  `);
+}
+
+/**
+ * Cierra la conexión y elimina archivos WAL/SHM antes de copiar o restaurar
+ * la base de datos. Evita corrupción y pantallas en blanco tras reinicio.
+ */
+function prepareForFileOperation() {
+  const dbPath = db ? db.name : storedDbPath;
+  if (db) {
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+    } catch (_) { /* ignorar si ya está cerrada */ }
+    db.close();
+    db = null;
+  }
+  if (dbPath) {
+    for (const suffix of ['-wal', '-shm']) {
+      const sidecar = `${dbPath}${suffix}`;
+      if (fs.existsSync(sidecar)) {
+        try { fs.unlinkSync(sidecar); } catch (_) { /* ignorar */ }
+      }
+    }
+  }
+  return dbPath;
 }
 
 /** Devuelve la ruta absoluta del archivo de base de datos activo. */
 function getDbPath() {
-  return db ? db.name : null;
+  return db ? db.name : storedDbPath;
 }
 
 /**
@@ -215,9 +252,10 @@ function getDb() {
 /** Cierra la conexión de forma segura. */
 function closeDatabase() {
   if (db) {
+    try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch (_) { /* ignorar */ }
     db.close();
     db = null;
   }
 }
 
-module.exports = { initDatabase, getDb, getDbPath, closeDatabase };
+module.exports = { initDatabase, getDb, getDbPath, closeDatabase, prepareForFileOperation };

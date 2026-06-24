@@ -1,75 +1,53 @@
 /**
  * importExportService.js
- * ------------------------------------------------------------------
- * Servicio de IMPORTACIÓN y EXPORTACIÓN de empleados (carpetas físicas)
- * desde/hacia Excel (.xlsx) y CSV (.csv), usando la librería `xlsx`.
- *
- * IMPORTACIÓN — soporta dos formatos de archivo:
- *
- *   FORMATO TIPO 1:
- *     Codigo · Nombre del Empleado · Novedad · Ubicacion · Area · Cargo
- *
- *   FORMATO TIPO 2:
- *     Codigo · Nombre Empleado · Documento ID · Sueldo · F/Novedad ·
- *     Fecha Retiro · Novedad · Ubicacion · Area · Cargo
- *     (Documento ID y Sueldo se IGNORAN. F/Novedad = Fecha de Ingreso.)
- *
- * Campos OBLIGATORIOS: Código/Cédula, Nombre, Área.
- * Campos OPCIONALES:   Cargo, Ubicación, Fecha Ingreso, Fecha Retiro, Estado.
- * ------------------------------------------------------------------
+ * Importación y exportación de empleados (Excel / CSV) con detección robusta
+ * de tablas, encabezados desplazados y soporte multi-hoja.
  */
 
+const fs = require('fs');
+const path = require('path');
 const XLSX = require('xlsx');
 const { getDb } = require('../database/database');
 const { actividadRepo } = require('../repositories/repositories');
 
-/* ── Utilidades de texto ── */
+const MAX_FILAS_ESCANEO = 80;
+const CEDULA_MIN_DIGITOS = 5;
+
 function normalizar(txt) {
   return String(txt || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // quitar acentos
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s/]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-/* ── Conversión de fechas ── */
 const MESES = {
   ene: '01', jan: '01', feb: '02', mar: '03', abr: '04', apr: '04',
   may: '05', jun: '06', jul: '07', ago: '08', aug: '08', sep: '09', set: '09',
   oct: '10', nov: '11', dic: '12', dec: '12',
 };
 
-/**
- * Convierte cadenas de fecha a formato ISO (yyyy-mm-dd). Soporta:
- *   - "JUN 12/2026", "MAY 01/2025", "JAN 03/2024"  (MON DD/YYYY)
- *   - "12/06/2026"  (dd/mm/yyyy)
- *   - "2026-06-12"  (ya ISO)
- * Devuelve null si no se puede interpretar.
- */
 function convertirFecha(valor) {
   if (!valor) return null;
   const v = String(valor).trim();
   if (!v) return null;
 
-  // Ya ISO
   let m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
 
-  // MON DD/YYYY  (ej. "JUN 12/2026")
   m = v.match(/^([A-Za-zÁ-úñÑ]{3,})\s+(\d{1,2})[\/\-](\d{4})$/);
   if (m) {
     const mes = MESES[normalizar(m[1]).slice(0, 3)];
     if (mes) return `${m[3]}-${mes}-${String(m[2]).padStart(2, '0')}`;
   }
 
-  // dd/mm/yyyy  (ej. "30/05/2026")
   m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
   if (m) {
     return `${m[3]}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`;
   }
 
-  // dd MON yyyy
   m = v.match(/^(\d{1,2})\s+([A-Za-zÁ-úñÑ]{3,})\s+(\d{4})$/);
   if (m) {
     const mes = MESES[normalizar(m[2]).slice(0, 3)];
@@ -79,7 +57,6 @@ function convertirFecha(valor) {
   return null;
 }
 
-/** Normaliza el estado/novedad a 'Activo' | 'Retirado'. */
 function normalizarEstado(valor) {
   const n = normalizar(valor);
   if (!n) return 'Activo';
@@ -87,21 +64,81 @@ function normalizarEstado(valor) {
   return 'Activo';
 }
 
-/* ── Mapeo de encabezados a campos canónicos ── */
-function detectarColumnas(headers) {
-  const mapa = {}; // campoCanonico -> indice de columna
+function sanitizeCedula(valor) {
+  return String(valor ?? '').replace(/\D/g, '');
+}
+
+/** Encabezados que NUNCA deben mapearse a cédula (ID interno / consecutivo). */
+const ENCABEZADOS_EXCLUIDOS_CODIGO = new Set([
+  'id', 'no', 'num', 'numero', 'nro', 'n', '#', 'item', 'items',
+  'consecutivo', 'secuencia', 'row', 'fila', 'index', 'indice',
+]);
+
+/** Puntúa qué tan probable es que un encabezado sea la columna de cédula/documento. */
+function puntuarEncabezadoCodigo(headerNorm) {
+  if (!headerNorm || ENCABEZADOS_EXCLUIDOS_CODIGO.has(headerNorm)) return -100;
+  if (headerNorm === 'codigo' || headerNorm === 'cedula') return 100;
+  if (headerNorm === 'documento id' || headerNorm === 'documento') return 95;
+  if (headerNorm === 'cc' || headerNorm === 'c c') return 90;
+  if (headerNorm === 'nit') return 85;
+  if (headerNorm.includes('cedula') || headerNorm.includes('codigo')) return 80;
+  if (headerNorm.includes('documento')) return 75;
+  if (headerNorm.includes('identificacion') || headerNorm.includes('identificación')) return 70;
+  return -50;
+}
+
+/** Puntúa una columna según el contenido de sus primeras filas de datos. */
+function puntuarColumnaPorDatos(filas, indiceCol, filaInicio) {
+  let score = 0;
+  let muestras = 0;
+  for (let r = filaInicio; r < Math.min(filas.length, filaInicio + 15); r++) {
+    const val = sanitizeCedula(filas[r]?.[indiceCol]);
+    if (!val) continue;
+    muestras++;
+    if (val.length >= 6) score += 10;
+    else if (val.length >= CEDULA_MIN_DIGITOS) score += 5;
+    else if (val.length <= 3) score -= 15;
+  }
+  return muestras ? score / muestras : 0;
+}
+
+function detectarColumnaCodigo(headers, filas, indiceEncabezado) {
+  let mejor = { idx: null, score: -Infinity };
   headers.forEach((h, i) => {
     const n = normalizar(h);
-    if (['codigo', 'cedula', 'documento', 'cc'].includes(n) || n === 'codigo') {
-      if (mapa.codigo == null) mapa.codigo = i;
-    }
-    if (['nombre del empleado', 'nombre empleado', 'nombre completo', 'nombre', 'empleado'].includes(n)) {
+    const scoreHdr = puntuarEncabezadoCodigo(n);
+    if (scoreHdr < 0) return;
+    const scoreDatos = puntuarColumnaPorDatos(filas, i, indiceEncabezado + 1);
+    const total = scoreHdr + scoreDatos;
+    if (total > mejor.score) mejor = { idx: i, score: total };
+  });
+  return mejor.idx;
+}
+
+function detectarColumnas(headers, filas = [], indiceEncabezado = 0) {
+  const mapa = {};
+
+  const idxCodigo = detectarColumnaCodigo(headers, filas, indiceEncabezado);
+  if (idxCodigo != null) mapa.codigo = idxCodigo;
+
+  headers.forEach((h, i) => {
+    const n = normalizar(h);
+    if (!n) return;
+
+    if (['nombre del empleado', 'nombre empleado', 'nombre completo', 'nombre', 'empleado'].includes(n) || n.includes('nombre')) {
       if (mapa.nombre == null) mapa.nombre = i;
     }
     if (n === 'novedad' || n === 'estado') { if (mapa.novedad == null) mapa.novedad = i; }
-    if (['ubicacion', 'ubicacion fisica', 'ubicación'].includes(n)) { if (mapa.ubicacion == null) mapa.ubicacion = i; }
-    if (n === 'area' || n === 'área') { if (mapa.area == null) mapa.area = i; }
-    if (n === 'cargo') { if (mapa.cargo == null) mapa.cargo = i; }
+    if (['ubicacion', 'ubicacion fisica', 'ubicación', 'ubicación fisica'].includes(n) || n.includes('ubicacion')) {
+      if (mapa.ubicacion == null) mapa.ubicacion = i;
+    }
+    if (n === 'area' || n === 'área' || (n.includes('area') && !n.includes('subarea'))) {
+      if (mapa.area == null) mapa.area = i;
+    }
+    if (n === 'cargo' || n.includes('cargo')) { if (mapa.cargo == null) mapa.cargo = i; }
+    if (['observaciones', 'observacion', 'notas', 'comentarios', 'nota'].includes(n) || n.includes('observacion')) {
+      if (mapa.observaciones == null) mapa.observaciones = i;
+    }
     if (['f/novedad', 'f novedad', 'fecha ingreso', 'fecha de ingreso', 'fecha_ingreso'].includes(n)) {
       if (mapa.fecha_ingreso == null) mapa.fecha_ingreso = i;
     }
@@ -109,86 +146,319 @@ function detectarColumnas(headers) {
       if (mapa.fecha_retiro == null) mapa.fecha_retiro = i;
     }
   });
+
   return mapa;
 }
 
-/**
- * Lee el archivo y devuelve una vista previa con filas válidas e inválidas.
- * @returns {{ ok, formato, columnas, filasValidas, filasInvalidas, total }}
- */
-function parsearArchivo(rutaArchivo) {
+function esCedulaValida(cedula) {
+  if (!cedula) return false;
+  if (cedula.length < CEDULA_MIN_DIGITOS) return false;
+  if (/^[1-9]\d{0,2}$/.test(cedula)) return false;
+  return true;
+}
+
+function filaTieneDatos(fila) {
+  return Array.isArray(fila) && fila.some((c) => String(c ?? '').trim() !== '');
+}
+
+function puntuarFilaEncabezado(fila) {
+  if (!filaTieneDatos(fila)) return 0;
+  const headers = fila.map((h) => String(h).trim());
+  const mapa = detectarColumnas(headers, [fila], 0);
+  let score = 0;
+  if (mapa.codigo != null) score += 3;
+  if (mapa.nombre != null) score += 3;
+  if (mapa.area != null) score += 2;
+  if (mapa.cargo != null) score += 1;
+  if (mapa.ubicacion != null) score += 1;
+  if (mapa.observaciones != null) score += 1;
+  if (mapa.novedad != null) score += 1;
+  return score;
+}
+
+function detectarFilaEncabezado(filas) {
+  let mejor = { idx: -1, score: 0 };
+  const limite = Math.min(filas.length, MAX_FILAS_ESCANEO);
+  for (let i = 0; i < limite; i++) {
+    const score = puntuarFilaEncabezado(filas[i]);
+    if (score >= 5 && score > mejor.score) {
+      mejor = { idx: i, score };
+    }
+  }
+  return mejor.idx;
+}
+
+function leerFilasDesdeHoja(ws) {
+  return XLSX.utils.sheet_to_json(ws, {
+    header: 1,
+    defval: '',
+    blankrows: false,
+    raw: false,
+  });
+}
+
+function leerWorkbook(rutaArchivo) {
+  const ext = path.extname(rutaArchivo).toLowerCase();
+  const opts = { cellDates: false, raw: false, sheetStubs: true };
+  if (ext === '.csv') {
+    const contenido = fs.readFileSync(rutaArchivo, 'utf-8').replace(/^\ufeff/, '');
+    return XLSX.read(contenido, { ...opts, type: 'string' });
+  }
+  return XLSX.readFile(rutaArchivo, opts);
+}
+
+function parsearFilasConEncabezado(filas, indiceEncabezado, nombreHoja) {
+  if (indiceEncabezado < 0 || !filas[indiceEncabezado]) {
+    return {
+      ok: false,
+      nombreHoja,
+      error: 'No se detectaron encabezados válidos en esta hoja.',
+      filasValidas: [],
+      filasInvalidas: [],
+      total: 0,
+    };
+  }
+
+  const headers = filas[indiceEncabezado].map((h) => String(h).trim());
+  const headersNorm = headers.map(normalizar);
+  const mapa = detectarColumnas(headers, filas, indiceEncabezado);
+
+  const faltanCols = [];
+  if (mapa.codigo == null) faltanCols.push('Código/Cédula');
+  if (mapa.nombre == null) faltanCols.push('Nombre');
+  if (mapa.area == null) faltanCols.push('Área');
+
+  if (faltanCols.length) {
+    return {
+      ok: false,
+      nombreHoja,
+      error: `Columnas obligatorias no encontradas: ${faltanCols.join(', ')}.`,
+      columnas: headers,
+      filasValidas: [],
+      filasInvalidas: [],
+      total: 0,
+      filaEncabezado: indiceEncabezado + 1,
+    };
+  }
+
+  const esTipo2 = headersNorm.some((h) =>
+    ['f/novedad', 'f novedad', 'documento id', 'sueldo', 'fecha retiro'].includes(h));
+  const formato = esTipo2 ? 'Tipo 2' : 'Tipo 1';
+
+  const filasValidas = [];
+  const filasInvalidas = [];
+
+  for (let r = indiceEncabezado + 1; r < filas.length; r++) {
+    const fila = filas[r];
+    if (!filaTieneDatos(fila)) continue;
+
+    const get = (campo) => (mapa[campo] != null ? String(fila[mapa[campo]] ?? '').trim() : '');
+
+    const cedula = sanitizeCedula(get('codigo'));
+    const nombre = get('nombre');
+    const area = get('area');
+    const cargo = get('cargo');
+    const ubicacion = get('ubicacion');
+    const observaciones = get('observaciones');
+    const novedad = get('novedad');
+    const fIngreso = get('fecha_ingreso');
+    const fRetiro = get('fecha_retiro');
+
+    const faltantes = [];
+    if (!cedula) faltantes.push('Código/Cédula');
+    else if (!esCedulaValida(cedula)) {
+      faltantes.push(`Código/Cédula inválido (${cedula}) — posible columna ID/consecutivo en lugar de documento`);
+    }
+    if (!nombre) faltantes.push('Nombre');
+    if (!area) faltantes.push('Área');
+
+    const registro = {
+      fila: r + 1,
+      hojaOrigen: nombreHoja,
+      cedula,
+      nombre_completo: nombre,
+      area,
+      cargo: cargo || null,
+      ubicacion_fisica: ubicacion || null,
+      observaciones: observaciones || null,
+      estado: normalizarEstado(novedad),
+      fecha_ingreso: convertirFecha(fIngreso),
+      fecha_retiro: convertirFecha(fRetiro),
+    };
+
+    if (faltantes.length) {
+      filasInvalidas.push({ ...registro, motivo: `Faltan o son inválidos: ${faltantes.join(', ')}.` });
+    } else {
+      filasValidas.push(registro);
+    }
+  }
+
+  return {
+    ok: true,
+    nombreHoja,
+    formato,
+    columnas: headers,
+    filaEncabezado: indiceEncabezado + 1,
+    filasValidas,
+    filasInvalidas,
+    total: filasValidas.length + filasInvalidas.length,
+  };
+}
+
+function parsearHoja(wb, nombreHoja) {
+  const ws = wb.Sheets[nombreHoja];
+  if (!ws) {
+    return { ok: false, nombreHoja, error: 'La hoja no existe.', filasValidas: [], filasInvalidas: [], total: 0 };
+  }
+  const filas = leerFilasDesdeHoja(ws);
+  if (!filas.length) {
+    return { ok: false, nombreHoja, error: 'La hoja está vacía.', filasValidas: [], filasInvalidas: [], total: 0 };
+  }
+  const idx = detectarFilaEncabezado(filas);
+  return parsearFilasConEncabezado(filas, idx, nombreHoja);
+}
+
+function resumirHoja(wb, nombreHoja) {
+  const res = parsearHoja(wb, nombreHoja);
+  return {
+    nombre: nombreHoja,
+    valida: (res.filasValidas?.length || 0) > 0 || (res.filasInvalidas?.length || 0) > 0,
+    formato: res.formato || null,
+    filaEncabezado: res.filaEncabezado || null,
+    totalValidas: res.filasValidas?.length || 0,
+    totalInvalidas: res.filasInvalidas?.length || 0,
+    totalEncontrados: (res.filasValidas?.length || 0) + (res.filasInvalidas?.length || 0),
+    error: res.error || null,
+  };
+}
+
+/** Procesa TODAS las hojas del libro y consolida resultados con trazabilidad. */
+function parsearTodasLasHojas(wb) {
+  const detalleHojas = [];
+  const filasValidasBrutas = [];
+  const filasInvalidas = [];
+  const duplicados = [];
+
+  for (const nombreHoja of wb.SheetNames) {
+    const res = parsearHoja(wb, nombreHoja);
+    const resumenHoja = {
+      nombre: nombreHoja,
+      procesada: Boolean(res.filasValidas?.length || res.filasInvalidas?.length),
+      validas: res.filasValidas?.length || 0,
+      invalidas: res.filasInvalidas?.length || 0,
+      encontrados: (res.filasValidas?.length || 0) + (res.filasInvalidas?.length || 0),
+      error: res.error || null,
+      filaEncabezado: res.filaEncabezado || null,
+    };
+    detalleHojas.push(resumenHoja);
+
+    if (res.filasValidas?.length) filasValidasBrutas.push(...res.filasValidas);
+    if (res.filasInvalidas?.length) {
+      filasInvalidas.push(...res.filasInvalidas.map((f) => ({
+        ...f,
+        motivo: f.motivo?.startsWith('[') ? f.motivo : `[${nombreHoja}] ${f.motivo}`,
+      })));
+    }
+  }
+
+  const mapaUnicos = new Map();
+  for (const f of filasValidasBrutas) {
+    if (mapaUnicos.has(f.cedula)) {
+      duplicados.push({
+        cedula: f.cedula,
+        hoja: f.hojaOrigen,
+        reemplazaHoja: mapaUnicos.get(f.cedula).hojaOrigen,
+      });
+    }
+    mapaUnicos.set(f.cedula, f);
+  }
+
+  const filasValidas = Array.from(mapaUnicos.values());
+
+  return {
+    filasValidas,
+    filasInvalidas,
+    resumenMultiHoja: {
+      totalHojasArchivo: wb.SheetNames.length,
+      hojasProcesadas: detalleHojas.filter((h) => h.procesada).length,
+      hojasConRegistrosValidos: detalleHojas.filter((h) => h.validas > 0).length,
+      registrosEncontrados: filasValidasBrutas.length + filasInvalidas.length,
+      registrosValidosEncontrados: filasValidasBrutas.length,
+      registrosUnicosAImportar: filasValidas.length,
+      duplicadosConsolidados: duplicados.length,
+      detalleHojas,
+      duplicados,
+    },
+  };
+}
+
+function listarHojasValidas(wb) {
+  return wb.SheetNames.map((nombre) => resumirHoja(wb, nombre)).filter((h) => h.valida);
+}
+
+function parsearArchivo(rutaArchivo, opciones = {}) {
   try {
-    const wb = XLSX.readFile(rutaArchivo, { cellDates: false, raw: false });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const filas = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', blankrows: false, raw: false });
-    if (!filas.length) {
-      return { ok: false, error: 'El archivo está vacío o no tiene datos.' };
+    const wb = leerWorkbook(rutaArchivo);
+    const hojasDisponibles = listarHojasValidas(wb);
+
+    if (!hojasDisponibles.length) {
+      return { ok: false, error: 'No se encontraron hojas con tablas de empleados válidas.' };
     }
 
-    const headers = filas[0].map((h) => String(h).trim());
-    const headersNorm = headers.map(normalizar);
-    const mapa = detectarColumnas(headers);
+    if (opciones.todasLasHojas) {
+      const { filasValidas, filasInvalidas, resumenMultiHoja } = parsearTodasLasHojas(wb);
+      const formatos = new Set();
+      resumenMultiHoja.detalleHojas.forEach((h) => {
+        const res = parsearHoja(wb, h.nombre);
+        if (res.formato) formatos.add(res.formato);
+      });
 
-    // Detección de formato: el Tipo 2 trae columnas adicionales
-    const esTipo2 = headersNorm.some((h) =>
-      ['f/novedad', 'f novedad', 'documento id', 'sueldo', 'fecha retiro'].includes(h));
-    const formato = esTipo2 ? 'Tipo 2' : 'Tipo 1';
-
-    const filasValidas = [];
-    const filasInvalidas = [];
-
-    for (let r = 1; r < filas.length; r++) {
-      const fila = filas[r];
-      const get = (campo) => (mapa[campo] != null ? String(fila[mapa[campo]] ?? '').trim() : '');
-
-      const cedula = get('codigo');
-      const nombre = get('nombre');
-      const area = get('area');
-      const cargo = get('cargo');
-      const ubicacion = get('ubicacion');
-      const novedad = get('novedad');
-      const fIngreso = get('fecha_ingreso');
-      const fRetiro = get('fecha_retiro');
-
-      // Validación de campos OBLIGATORIOS
-      const faltantes = [];
-      if (!cedula) faltantes.push('Código/Cédula');
-      if (!nombre) faltantes.push('Nombre');
-      if (!area) faltantes.push('Área');
-
-      const registro = {
-        fila: r + 1,
-        cedula,
-        nombre_completo: nombre,
-        area,
-        cargo: cargo || null,
-        ubicacion_fisica: ubicacion || null,
-        estado: normalizarEstado(novedad),
-        fecha_ingreso: convertirFecha(fIngreso),
-        fecha_retiro: convertirFecha(fRetiro),
-      };
-
-      if (faltantes.length) {
-        filasInvalidas.push({ ...registro, motivo: `Faltan campos obligatorios: ${faltantes.join(', ')}.` });
-      } else {
-        filasValidas.push(registro);
+      if (!filasValidas.length && !filasInvalidas.length) {
+        return { ok: false, error: 'Ninguna hoja contenía registros procesables.' };
       }
+
+      return {
+        ok: true,
+        rutaArchivo,
+        multiHoja: wb.SheetNames.length > 1,
+        hojas: hojasDisponibles,
+        hojaActiva: 'Todas las hojas',
+        formato: formatos.size === 1 ? [...formatos][0] : 'Mixto',
+        columnas: filasValidas[0] ? [] : [],
+        filasValidas,
+        filasInvalidas,
+        total: filasValidas.length + filasInvalidas.length,
+        resumenMultiHoja,
+      };
+    }
+
+    const hojaActiva = opciones.hoja && wb.SheetNames.includes(opciones.hoja)
+      ? opciones.hoja
+      : hojasDisponibles[0].nombre;
+
+    const resultado = parsearHoja(wb, hojaActiva);
+    if (!resultado.ok && !resultado.filasValidas?.length) {
+      return { ok: false, error: resultado.error || 'No se pudo procesar la hoja seleccionada.' };
     }
 
     return {
       ok: true,
-      formato,
-      columnas: headers,
-      filasValidas,
-      filasInvalidas,
-      total: filas.length - 1,
+      rutaArchivo,
+      multiHoja: wb.SheetNames.length > 1,
+      hojas: hojasDisponibles,
+      hojaActiva,
+      formato: resultado.formato,
+      columnas: resultado.columnas,
+      filaEncabezado: resultado.filaEncabezado,
+      filasValidas: resultado.filasValidas,
+      filasInvalidas: resultado.filasInvalidas,
+      total: resultado.total,
     };
   } catch (err) {
     return { ok: false, error: `No se pudo leer el archivo: ${err.message}` };
   }
 }
 
-/* ── Helpers de persistencia (buscar o crear catálogos) ── */
 function buscarOCrearArea(db, nombre) {
   if (!nombre) return null;
   const row = db.prepare('SELECT id_area FROM area WHERE LOWER(nom_area) = LOWER(?)').get(nombre.trim());
@@ -207,20 +477,26 @@ function buscarOCrearCargo(db, nombre, idArea) {
   return r.lastInsertRowid;
 }
 
-/**
- * Importa las filas válidas a la base de datos (upsert por cédula).
- * Crea el área y el cargo si no existen.
- * @returns {{ ok, data: { insertados, actualizados, errores } }}
- */
 function importarEmpleados(filasValidas, idUsuario = null) {
   const db = getDb();
   let insertados = 0;
   let actualizados = 0;
   const errores = [];
+  const omitidos = [];
 
   const tx = db.transaction(() => {
     for (const fila of filasValidas) {
       try {
+        if (!esCedulaValida(fila.cedula)) {
+          omitidos.push({
+            cedula: fila.cedula,
+            nombre: fila.nombre_completo,
+            hoja: fila.hojaOrigen,
+            motivo: 'Cédula inválida o demasiado corta (posible ID de fila).',
+          });
+          continue;
+        }
+
         const idArea = buscarOCrearArea(db, fila.area);
         const idCargo = buscarOCrearCargo(db, fila.cargo, idArea);
         const existente = db.prepare('SELECT id_empleado FROM empleado WHERE cedula = ?').get(fila.cedula);
@@ -228,13 +504,13 @@ function importarEmpleados(filasValidas, idUsuario = null) {
         if (existente) {
           db.prepare(`
             UPDATE empleado SET
-              nombre_completo = ?, estado = ?, ubicacion_fisica = ?,
+              nombre_completo = ?, estado = ?, ubicacion_fisica = ?, observaciones = ?,
               fk_id_area = ?, fk_id_cargo = ?,
               fecha_ingreso = COALESCE(?, fecha_ingreso),
               fecha_retiro = ?, updatedAt = datetime('now','localtime')
             WHERE id_empleado = ?`)
             .run(
-              fila.nombre_completo, fila.estado, fila.ubicacion_fisica,
+              fila.nombre_completo, fila.estado, fila.ubicacion_fisica, fila.observaciones || null,
               idArea, idCargo, fila.fecha_ingreso, fila.fecha_retiro,
               existente.id_empleado
             );
@@ -242,40 +518,50 @@ function importarEmpleados(filasValidas, idUsuario = null) {
         } else {
           db.prepare(`
             INSERT INTO empleado
-              (cedula, nombre_completo, estado, ubicacion_fisica, fk_id_area,
+              (cedula, nombre_completo, estado, ubicacion_fisica, observaciones, fk_id_area,
                fk_id_cargo, fecha_ingreso, fecha_retiro)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(
               fila.cedula, fila.nombre_completo, fila.estado, fila.ubicacion_fisica,
-              idArea, idCargo, fila.fecha_ingreso, fila.fecha_retiro
+              fila.observaciones || null, idArea, idCargo, fila.fecha_ingreso, fila.fecha_retiro
             );
           insertados++;
         }
       } catch (e) {
-        errores.push({ cedula: fila.cedula, motivo: e.message });
+        errores.push({ cedula: fila.cedula, nombre: fila.nombre_completo, hoja: fila.hojaOrigen, motivo: e.message });
       }
     }
   });
 
   try {
     tx();
+    const exitosos = insertados + actualizados;
     actividadRepo.registrar({
       accion: 'importacion',
-      detalle: `Importación de empleados: ${insertados} nuevos, ${actualizados} actualizados`,
+      detalle: `Importación: ${insertados} nuevos, ${actualizados} actualizados, ${omitidos.length} omitidos`,
       entidad: 'empleado', fk_id_usuario: idUsuario,
     });
-    return { ok: true, data: { insertados, actualizados, errores } };
+    return {
+      ok: true,
+      data: {
+        insertados,
+        actualizados,
+        errores,
+        omitidos,
+        resumen: {
+          registrosRecibidos: filasValidas.length,
+          registrosImportados: exitosos,
+          registrosOmitidos: omitidos.length + errores.length,
+          insertados,
+          actualizados,
+        },
+      },
+    };
   } catch (err) {
     return { ok: false, error: err.message };
   }
 }
 
-/**
- * Exporta los empleados a un archivo Excel o CSV.
- * @param {'activos'|'retirados'|'todos'} filtro
- * @param {'xlsx'|'csv'} formato
- * @param {string} rutaDestino
- */
 function exportarEmpleados(filtro, formato, rutaDestino) {
   try {
     const db = getDb();
@@ -286,7 +572,7 @@ function exportarEmpleados(filtro, formato, rutaDestino) {
     const filas = db.prepare(`
       SELECT e.cedula AS "Cédula",
              e.nombre_completo AS "Nombre",
-             COALESCE(a.nom_area, a2.nom_area, '') AS "Área",
+             COALESCE(ad.nom_area, ac.nom_area, '') AS "Área",
              COALESCE(c.nom_cargo, '') AS "Cargo",
              COALESCE(e.genero, '') AS "Género",
              COALESCE(t.camisa, '') AS "Talla Camisa",
@@ -295,14 +581,15 @@ function exportarEmpleados(filtro, formato, rutaDestino) {
              COALESCE(e.fecha_ingreso, '') AS "Fecha Ingreso",
              COALESCE(e.fecha_retiro, '') AS "Fecha Retiro",
              e.estado AS "Estado",
-             COALESCE(e.ubicacion_fisica, '') AS "Ubicación Física"
+             COALESCE(e.ubicacion_fisica, '') AS "Ubicación Física",
+             COALESCE(e.observaciones, '') AS "Observaciones"
       FROM empleado e
-      LEFT JOIN area a   ON a.id_area = e.fk_id_area
       LEFT JOIN cargo c  ON c.id_cargo = e.fk_id_cargo
-      LEFT JOIN area a2  ON a2.id_area = c.fk_id_area
+      LEFT JOIN area ad  ON ad.id_area = e.fk_id_area
+      LEFT JOIN area ac  ON ac.id_area = c.fk_id_area
       LEFT JOIN talla t  ON t.id_talla = e.fk_id_talla
       ${where}
-      ORDER BY e.nombre_completo ASC`).all();
+      ORDER BY COALESCE(ad.nom_area, ac.nom_area, ''), e.nombre_completo ASC`).all();
 
     const ws = XLSX.utils.json_to_sheet(filas);
     const wb = XLSX.utils.book_new();
@@ -310,12 +597,12 @@ function exportarEmpleados(filtro, formato, rutaDestino) {
 
     if (formato === 'csv') {
       const csv = XLSX.utils.sheet_to_csv(ws);
-      require('fs').writeFileSync(rutaDestino, '\ufeff' + csv, 'utf-8'); // BOM para tildes
+      fs.writeFileSync(rutaDestino, '\ufeff' + csv, 'utf-8');
     } else {
       XLSX.writeFile(wb, rutaDestino, { bookType: 'xlsx' });
     }
 
-    return { ok: true, data: { total: filas.length, ruta: rutaDestino } };
+    return { ok: true, data: { total: filas.length, ruta: rutaDestino, filtro } };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -325,5 +612,8 @@ module.exports = {
   parsearArchivo,
   importarEmpleados,
   exportarEmpleados,
-  convertirFecha, // exportado para pruebas
+  convertirFecha,
+  detectarFilaEncabezado,
+  detectarColumnas,
+  esCedulaValida,
 };

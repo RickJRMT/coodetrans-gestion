@@ -2,7 +2,11 @@
   "name": "coodetrans-app",
   "version": "1.0.0",
   "description": "Aplicación de escritorio para gestión documental e inventario de Coodetrans",
-  "author": "RickLabs",
+  "author": {
+    "name": "RickLabs",
+    "email": "contacto@ricklabs.co"
+  },
+  "homepage": "https://www.coodetrans.com",
   "license": "MIT",
   "main": "src/main/main.js",
   "type": "commonjs",
@@ -11,9 +15,14 @@
     "dev:electron": "wait-on tcp:5173 && cross-env NODE_ENV=development electron .",
     "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
     "build:renderer": "vite build",
-    "build": "npm run build:renderer && electron-builder",
+    "build": "npm run prepare:icons && npm run build:renderer && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --x64",
+    "build:portable": "npm run prepare:icons && npm run build:renderer && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win portable --x64",
+    "build:installer": "npm run prepare:icons && npm run build:renderer && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis --x64",
+    "build:all": "npm run build:renderer && electron-builder -mwl",
     "start": "cross-env NODE_ENV=development electron .",
-    "rebuild": "electron-rebuild -f -w better-sqlite3"
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "prepare:icons": "node scripts/prepare-icons.js",
+    "test:import": "node scripts/test-import-export.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
@@ -32,14 +41,20 @@
     "cross-env": "^7.0.3",
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
+    "png-to-ico": "^3.0.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "vite": "^6.0.3",
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.ricklabs.coodetrans",
+    "appId": "com.ricklabs.coodetrans.gestion",
     "productName": "Coodetrans Gestión",
+    "copyright": "Copyright © 2026 RickLabs. Todos los derechos reservados.",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "compression": "maximum",
+    "asar": true,
+    "forceCodeSigning": false,
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -53,7 +68,9 @@
       "src/services/**/*",
       "src/config/**/*",
       "dist-renderer/**/*",
-      "package.json"
+      "package.json",
+      "!**/*.map",
+      "!**/*.md"
     ],
     "extraResources": [
       {
@@ -65,13 +82,54 @@
       "**/node_modules/better-sqlite3/**"
     ],
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "publisherName": "RickLabs",
+      "verifyUpdateCodeSignature": false,
+      "signAndEditExecutable": false,
+      "legalTrademarks": "Coodetrans® es marca de la cooperativa Coodetrans.",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Coodetrans Gestión",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "deleteAppDataOnUninstall": false,
+      "license": "build/license.txt",
+      "unicode": true,
+      "warningsAsErrors": false
     },
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "icon": "build/icon.png",
+      "category": "public.app-category.business",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "linux": {
-      "target": "AppImage"
-    }
+      "target": "AppImage",
+      "icon": "build/icon.png",
+      "category": "Office",
+      "maintainer": "RickLabs <contacto@ricklabs.co>"
+    },
+    "publish": null
   }
 }

@@ -115,14 +115,9 @@ export default function LoginPage() {
               className="w-full mt-2"
               disabled={cargando}
             >
-              {cargando ? 'Verificando...' : 'Iniciar sesión'}
+              {cargando ? 'Verificando...' : 'Ingresar'}
             </Button>
           </form>
-
-          <div className="mt-6 p-3 bg-primary-light/60 rounded-lg text-xs text-primary-dark">
-            <p className="font-semibold mb-1">Credenciales de prueba</p>
-            <p>Usuario: <span className="font-mono">admin</span> · Contraseña: <span className="font-mono">admin123</span></p>
-          </div>
         </div>
       </div>
     </div>
