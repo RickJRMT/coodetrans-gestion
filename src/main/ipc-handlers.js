@@ -142,12 +142,12 @@ function registrarHandlersIPC({ reiniciarTrasRestauracionBD } = {}) {
 
     const confirm = await dialog.showMessageBox(win, {
       type: 'warning',
-      buttons: ['Cancelar', 'Restaurar y reiniciar'],
+      buttons: ['Cancelar', 'Restaurar y recargar'],
       defaultId: 0,
       cancelId: 0,
       title: 'Confirmar restauración',
       message: '¿Está seguro de restaurar la base de datos?',
-      detail: 'Se reemplazarán todos los datos actuales por los del archivo seleccionado. La aplicación se reiniciará al finalizar.',
+      detail: 'Se reemplazarán todos los datos actuales por los del archivo seleccionado. La aplicación recargará la información sin cerrar su sesión.',
     });
     if (confirm.response !== 1) return { ok: false, error: 'Operación cancelada.' };
 

@@ -96,5 +96,46 @@ contextBridge.exposeInMainWorld('api', {
     info: () => invoke('db:info'),
     backup: () => invoke('db:backup'),
     restore: () => invoke('db:restore'),
+    onRestored: (callback) => {
+      const listener = (_event) => callback();
+      ipcRenderer.on('db:restored', listener);
+      return () => ipcRenderer.removeListener('db:restored', listener);
+    },
+  },
+
+  // Se aplica para version global (hace que en todo el aplicativo se actualice en version actualizada)
+  app: {
+    version: () => invoke('app:get-version'),
+  },
+
+  // Actualizaciones por parte del repositorio de github
+  update: {
+    disponible: (callback) => {
+      const listener = (_, data) => callback(data);
+
+      ipcRenderer.on('update:available', listener);
+
+      return () => {
+        ipcRenderer.removeListener(
+          'update:available',
+          listener
+        );
+      };
+    },
+
+    descargada: (callback) => {
+      const listener = (_, data) => callback(data);
+
+      ipcRenderer.on('update:downloaded', listener);
+
+      return () => {
+        ipcRenderer.removeListener(
+          'update:downloaded',
+          listener
+        );
+      };
+    },
+
+    instalar: () => invoke('update:install'),
   },
 });

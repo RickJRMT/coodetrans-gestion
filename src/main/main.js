@@ -3,11 +3,13 @@
  * Proceso principal de Electron.
  */
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { initDatabase, closeDatabase } = require('../database/database');
 const { registrarHandlersIPC } = require('./ipc-handlers');
+const { ipcMain } = require('electron');
+const { autoUpdater } = require('electron-updater');
 
 const VITE_DEV_URL = 'http://localhost:5173';
 
@@ -24,6 +26,23 @@ function esModoDesarrollo() {
 const isDev = esModoDesarrollo();
 let mainWindow = null;
 
+/** Icono corporativo para ventana, barra de tareas y accesos directos en runtime. */
+function resolverIconoApp() {
+  const candidatos = [
+    path.join(process.resourcesPath || '', 'icon.ico'),
+    path.join(process.resourcesPath || '', 'icon.png'),
+    path.join(__dirname, '../../build/icon.ico'),
+    path.join(__dirname, '../../build/icon.png'),
+    path.join(__dirname, '../../src/renderer/assets/coodetransLogo.png'),
+  ];
+  for (const ruta of candidatos) {
+    if (!ruta || !fs.existsSync(ruta)) continue;
+    const img = nativeImage.createFromPath(ruta);
+    if (!img.isEmpty()) return img;
+  }
+  return undefined;
+}
+
 function cargarRenderer(win) {
   if (isDev) {
     let intentos = 0;
@@ -31,7 +50,7 @@ function cargarRenderer(win) {
 
     const intentarCarga = () => {
       intentos += 1;
-      win.loadURL(VITE_DEV_URL).catch(() => {});
+      win.loadURL(VITE_DEV_URL).catch(() => { });
     };
 
     win.webContents.on('did-fail-load', (_event, errorCode, _desc, validatedURL) => {
@@ -52,6 +71,7 @@ function cargarRenderer(win) {
 }
 
 function createWindow() {
+  const icono = resolverIconoApp();
   mainWindow = new BrowserWindow({
     width: 1320,
     height: 860,
@@ -60,6 +80,7 @@ function createWindow() {
     show: false,
     backgroundColor: '#F4F7F9',
     title: 'Coodetrans Gestión',
+    icon: icono,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -74,32 +95,46 @@ function createWindow() {
 }
 
 /**
- * Tras restaurar la BD: en desarrollo recarga sin matar Vite;
- * en producción reinicia el proceso completo.
+ * Tras restaurar la BD: recarga suave del renderer en todos los entornos.
+ * Evita app.relaunch() que destruye sessionStorage y fuerza el login.
  */
 function reiniciarTrasRestauracionBD() {
-  const userData = app.getPath('userData');
-  initDatabase(userData);
+  closeDatabase();
+  initDatabase(app.getPath('userData'));
 
-  if (isDev) {
-    const ventanas = BrowserWindow.getAllWindows();
-    if (ventanas.length) {
-      ventanas.forEach((w) => w.webContents.reload());
-    } else {
-      createWindow();
-    }
-    return { modo: 'recarga-suave' };
+  const ventanas = BrowserWindow.getAllWindows();
+  if (ventanas.length) {
+    ventanas.forEach((w) => {
+      if (!w.isDestroyed()) {
+        w.webContents.send('db:restored');
+        w.webContents.reload();
+      }
+    });
+  } else {
+    createWindow();
   }
-
-  app.relaunch({ args: process.argv.slice(1).concat(['--relaunch-dev']) });
-  app.exit(0);
-  return { modo: 'reinicio-completo' };
+  return { modo: 'recarga-suave' };
 }
 
+ipcMain.handle('app:get-version', () => {
+  return app.getVersion();
+});
+
+ipcMain.handle('update:install', () => {
+  autoUpdater.quitAndInstall();
+});
+
 app.whenReady().then(() => {
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.ricklabs.coodetrans.gestion');
+  }
   initDatabase(app.getPath('userData'));
   registrarHandlersIPC({ reiniciarTrasRestauracionBD });
   createWindow();
+
+  if (!isDev) {
+    autoUpdater.checkForUpdatesAndNotify();
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -114,4 +149,42 @@ app.on('will-quit', () => {
   closeDatabase();
 });
 
+autoUpdater.on('update-available', (info) => {
+  mainWindow?.webContents.send('update:available', info);
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  mainWindow?.webContents.send('update:downloaded', info);
+});
+
+// Logs para ver exactamente que ocurre
+autoUpdater.on('checking-for-update', () => {
+  console.log('[Updater] Buscando actualizaciones...');
+});
+
+autoUpdater.on('update-available', (info) => {
+  console.log('[Updater] Actualización disponible:', info.version);
+
+  mainWindow?.webContents.send(
+    'update:available',
+    info
+  );
+});
+
+autoUpdater.on('update-not-available', () => {
+  console.log('[Updater] No hay actualizaciones disponibles');
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('[Updater] Actualización descargada:', info.version);
+
+  mainWindow?.webContents.send(
+    'update:downloaded',
+    info
+  );
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('[Updater] Error:', err);
+});
 module.exports = { reiniciarTrasRestauracionBD, esModoDesarrollo };
