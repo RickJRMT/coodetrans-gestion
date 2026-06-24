@@ -1,0 +1,77 @@
+/**
+ * preload.js
+ * Puente seguro (contextBridge) entre el proceso de renderizado (React) y
+ * el proceso principal (Node.js). Expone una API mínima y controlada bajo
+ * `window.api`. El renderer NUNCA accede directamente a Node ni a la BD.
+ */
+
+const { contextBridge, ipcRenderer } = require('electron');
+
+// Helper para invocar canales IPC de forma uniforme
+const invoke = (canal, payload) => ipcRenderer.invoke(canal, payload);
+
+contextBridge.exposeInMainWorld('api', {
+  // Autenticación
+  auth: {
+    login: (credenciales) => invoke('auth:login', credenciales),
+  },
+
+  // Dashboard
+  dashboard: {
+    obtenerResumen: () => invoke('dashboard:resumen'),
+  },
+
+  // Catálogos / datos maestros
+  catalogos: {
+    areas: () => invoke('catalogo:areas'),
+    areasActivas: () => invoke('catalogo:areasActivas'),
+    cargos: () => invoke('catalogo:cargos'),
+    cargosActivos: () => invoke('catalogo:cargosActivos'),
+    ubicaciones: () => invoke('catalogo:ubicaciones'),
+    crearArea: (datos, idUsuario) => invoke('area:crear', { datos, idUsuario }),
+    actualizarArea: (id, datos, idUsuario) => invoke('area:actualizar', { id, datos, idUsuario }),
+    cambiarEstadoArea: (id, estado, idUsuario) => invoke('area:estado', { id, estado, idUsuario }),
+    crearCargo: (datos, idUsuario) => invoke('cargo:crear', { datos, idUsuario }),
+    actualizarCargo: (id, datos, idUsuario) => invoke('cargo:actualizar', { id, datos, idUsuario }),
+    cambiarEstadoCargo: (id, estado, idUsuario) => invoke('cargo:estado', { id, estado, idUsuario }),
+  },
+
+  // Empleados (carpetas)
+  empleados: {
+    listar: () => invoke('empleado:listar'),
+    obtener: (id) => invoke('empleado:obtener', id),
+    crear: (datos, idUsuario) => invoke('empleado:crear', { datos, idUsuario }),
+    actualizar: (id, datos, idUsuario) => invoke('empleado:actualizar', { id, datos, idUsuario }),
+    historial: (id) => invoke('empleado:historial', id),
+  },
+
+  // Inventario
+  inventario: {
+    listar: () => invoke('inventario:listar'),
+    resumen: () => invoke('inventario:resumen'),
+    variantes: () => invoke('inventario:variantes'),
+  },
+
+  // Movimientos / entregas
+  movimientos: {
+    listar: (limite) => invoke('movimiento:listar', limite),
+    listarEntregas: (filtros) => invoke('entrega:listar', filtros),
+    detalleEntrega: (id) => invoke('entrega:detalle', id),
+    crearEntrega: (datos, idUsuario) => invoke('entrega:crear', { datos, idUsuario }),
+  },
+
+  // Usuarios (configuración)
+  usuarios: {
+    listar: () => invoke('usuario:listar'),
+    crear: (datos, idUsuario) => invoke('usuario:crear', { datos, idUsuario }),
+    actualizar: (id, datos, idUsuario) => invoke('usuario:actualizar', { id, datos, idUsuario }),
+    cambiarEstado: (id, estado, idUsuario) => invoke('usuario:estado', { id, estado, idUsuario }),
+  },
+
+  // Base de datos (copia de seguridad / restauración)
+  bd: {
+    info: () => invoke('db:info'),
+    backup: () => invoke('db:backup'),
+    restore: () => invoke('db:restore'),
+  },
+});
