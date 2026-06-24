@@ -1,0 +1,8 @@
+LICENCIA DE USO - COODETRANS GESTION
+
+Copyright (c) 2026 RickLabs. Todos los derechos reservados.
+
+Este software se distribuye bajo licencia MIT para uso autorizado por Coodetrans
+y sus operadores designados.
+
+Para soporte tecnico contacte a RickLabs.
