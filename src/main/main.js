@@ -134,6 +134,7 @@ app.whenReady().then(() => {
 
   if (!isDev) {
     autoUpdater.checkForUpdatesAndNotify();
+    console.log('[Updater] Comprobando actualizaciones...');
   }
 
   app.on('activate', () => {

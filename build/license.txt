@@ -1,17 +1,16 @@
+COODETRANS GESTION
 
-      COODETRANS GESTIÓN
+    Licencia de Uso Interno
 
-      Licencia de Uso Interno
+    Copyright © 2026 RickLabs.
 
-      Copyright © 2026 RickLabs.
+    Este software fue desarrollado por RickLabs como parte de las actividades realizadas para Coodetrans.
 
-      Este software fue desarrollado por RickLabs como parte de las actividades realizadas para Coodetrans.
+    La aplicación está destinada exclusivamente al uso interno de Coodetrans y no podra ser distribuida, comercializada o cedida a terceros sin autorizacion expresa.
 
-      La aplicación está destinada exclusivamente al uso interno de Coodetrans y no podrá ser distribuida, comercializada o cedida a terceros sin autorización expresa.
+    Todos los derechos de autor sobre el codigo fuente, documentacion tecnica y recursos asociados permanecen protegidos por la legislacion aplicable sobre propiedad intelectual.
 
-      Todos los derechos de autor sobre el código fuente, documentación técnica y recursos asociados permanecen protegidos por la legislación aplicable sobre propiedad intelectual.
+    El software se proporciona "tal cual", sin garantias expresas o implicitas.
 
-      El software se proporciona "tal cual", sin garantías expresas o implícitas.
-
-      RickLabs
-      2026
+    RickLabs
+    2026

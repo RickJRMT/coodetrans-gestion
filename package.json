@@ -1,5 +1,5 @@
 {
-  "name": "coodetrans-app",
+  "name": "coodetrans-gestion",
   "version": "1.0.1",
   "description": "Aplicación de escritorio para gestión documental e inventario de Coodetrans",
   "author": {
@@ -54,9 +54,9 @@
   },
   "build": {
     "appId": "com.ricklabs.coodetrans.gestion",
-    "productName": "Coodetrans Gestión",
+    "productName": "coodetrans-gestión",
     "copyright": "Copyright © 2026 RickLabs. Todos los derechos reservados.",
-    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "artifactName": "${productName}-setup-${version}.${ext}",
     "compression": "maximum",
     "asar": true,
     "forceCodeSigning": false,

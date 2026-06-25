@@ -8,23 +8,22 @@ const path = require('path');
 
 const SIZES_ICO = [16, 24, 32, 48, 64, 128, 256];
 
-const LICENSE_CONTENT = `
-      COODETRANS GESTIÓN
+const LICENSE_CONTENT = `COODETRANS GESTION
 
-      Licencia de Uso Interno
+    Licencia de Uso Interno
 
-      Copyright © 2026 RickLabs.
+    Copyright © 2026 RickLabs.
 
-      Este software fue desarrollado por RickLabs como parte de las actividades realizadas para Coodetrans.
+    Este software fue desarrollado por RickLabs como parte de las actividades realizadas para Coodetrans.
 
-      La aplicación está destinada exclusivamente al uso interno de Coodetrans y no podrá ser distribuida, comercializada o cedida a terceros sin autorización expresa.
+    La aplicación está destinada exclusivamente al uso interno de Coodetrans y no podra ser distribuida, comercializada o cedida a terceros sin autorizacion expresa.
 
-      Todos los derechos de autor sobre el código fuente, documentación técnica y recursos asociados permanecen protegidos por la legislación aplicable sobre propiedad intelectual.
+    Todos los derechos de autor sobre el codigo fuente, documentacion tecnica y recursos asociados permanecen protegidos por la legislacion aplicable sobre propiedad intelectual.
 
-      El software se proporciona "tal cual", sin garantías expresas o implícitas.
+    El software se proporciona "tal cual", sin garantias expresas o implicitas.
 
-      RickLabs
-      2026
+    RickLabs
+    2026
 `;
 
 async function main() {
