@@ -133,6 +133,31 @@ export default function Layout() {
           </div>
         </main>
       </div>
+      {actualizacionDisponible && !actualizacionLista && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-[420px] shadow-xl">
+            <h2 className="text-lg font-bold mb-2">
+              Nueva actualización disponible
+            </h2>
+
+            <p className="text-sm text-gray-600">
+              Se encontró una nueva versión de Coodetrans Gestión.
+            </p>
+
+            <p className="text-sm mt-2 font-medium">
+              Versión: {actualizacionDisponible?.version}
+            </p>
+
+            <div className="mt-4 flex items-center gap-3">
+              <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+
+              <span className="text-sm">
+                Descargando actualización...
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
       {actualizacionLista && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-[450px] shadow-xl">

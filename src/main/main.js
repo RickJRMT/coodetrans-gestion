@@ -158,10 +158,11 @@ autoUpdater.on('checking-for-update', () => {
 autoUpdater.on('update-available', (info) => {
   console.log('[Updater] Actualización disponible:', info.version);
 
-  mainWindow?.webContents.send(
-    'update:available',
-    info
-  );
+  mainWindow?.webContents.send('update:available', {
+    version: info.version,
+    fecha: info.releaseDate,
+    notas: info.releaseNotes,
+  });
 });
 
 autoUpdater.on('update-not-available', () => {
@@ -171,10 +172,11 @@ autoUpdater.on('update-not-available', () => {
 autoUpdater.on('update-downloaded', (info) => {
   console.log('[Updater] Actualización descargada:', info.version);
 
-  mainWindow?.webContents.send(
-    'update:downloaded',
-    info
-  );
+  mainWindow?.webContents.send('update:downloaded', {
+    version: info.version,
+    fecha: info.releaseDate,
+    notas: info.releaseNotes,
+  });
 });
 
 autoUpdater.on('error', (err) => {
