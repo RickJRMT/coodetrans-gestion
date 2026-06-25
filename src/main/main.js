@@ -150,14 +150,6 @@ app.on('will-quit', () => {
   closeDatabase();
 });
 
-autoUpdater.on('update-available', (info) => {
-  mainWindow?.webContents.send('update:available', info);
-});
-
-autoUpdater.on('update-downloaded', (info) => {
-  mainWindow?.webContents.send('update:downloaded', info);
-});
-
 // Logs para ver exactamente que ocurre
 autoUpdater.on('checking-for-update', () => {
   console.log('[Updater] Buscando actualizaciones...');
