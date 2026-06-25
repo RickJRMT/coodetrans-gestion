@@ -133,8 +133,17 @@ app.whenReady().then(() => {
   createWindow();
 
   if (!isDev) {
-    autoUpdater.checkForUpdatesAndNotify();
-    console.log('[Updater] Comprobando actualizaciones...');
+    // autoUpdater.checkForUpdatesAndNotify();
+    // console.log('[Updater] Comprobando actualizaciones...');
+    // setTimeout(() => {
+    //   console.log("Buscando actualización...");
+    //   autoUpdater.checkForUpdatesAndNotify();
+    // }, 5000);
+    mainWindow.webContents.once("did-finish-load", () => {
+
+      autoUpdater.checkForUpdatesAndNotify();
+
+    });
   }
 
   app.on('activate', () => {
