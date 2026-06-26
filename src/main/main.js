@@ -90,7 +90,14 @@ function createWindow() {
   });
 
   cargarRenderer(mainWindow);
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+
+    if (!isDev) {
+      console.log('[Updater] Buscando actualizaciones...');
+      autoUpdater.checkForUpdates();
+    }
+  });
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
@@ -132,19 +139,10 @@ app.whenReady().then(() => {
   registrarHandlersIPC({ reiniciarTrasRestauracionBD });
   createWindow();
 
-  if (!isDev) {
-    // autoUpdater.checkForUpdatesAndNotify();
-    // console.log('[Updater] Comprobando actualizaciones...');
-    // setTimeout(() => {
-    //   console.log("Buscando actualización...");
-    //   autoUpdater.checkForUpdatesAndNotify();
-    // }, 5000);
-    mainWindow.webContents.once("did-finish-load", () => {
-
-      autoUpdater.checkForUpdatesAndNotify();
-
-    });
-  }
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0)
+      createWindow();
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -167,11 +165,15 @@ autoUpdater.on('checking-for-update', () => {
 autoUpdater.on('update-available', (info) => {
   console.log('[Updater] Actualización disponible:', info.version);
 
-  mainWindow?.webContents.send('update:available', {
-    version: info.version,
-    fecha: info.releaseDate,
-    notas: info.releaseNotes,
-  });
+  setTimeout(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
+    mainWindow.webContents.send('update:available', {
+      version: info.version,
+      fecha: info.releaseDate,
+      notas: info.releaseNotes,
+    });
+  }, 1200);
 });
 
 autoUpdater.on('update-not-available', () => {

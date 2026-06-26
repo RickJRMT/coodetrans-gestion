@@ -36,13 +36,21 @@ export default function Layout() {
 
     const limpiar1 =
       window.api?.update?.disponible?.((info) => {
-        console.log('Actualización disponible:', info);
+
+        console.log("RECIBÍ update:available");
+
+        console.log(info);
+
         setActualizacionDisponible(info);
       });
 
     const limpiar2 =
       window.api?.update?.descargada?.((info) => {
-        console.log('Actualización descargada:', info);
+
+        console.log("RECIBÍ update:downloaded");
+
+        console.log(info);
+
         setActualizacionDisponible(null);
         setActualizacionLista(info);
       });

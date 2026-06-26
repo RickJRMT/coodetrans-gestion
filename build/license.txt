@@ -4,8 +4,12 @@ Licencia de Uso Interno
 Copyright © 2026 RickLabs.
 
 Este software fue desarrollado por RickLabs como parte de las actividades realizadas para Coodetrans.
+
 La aplicacion esta destinada exclusivamente al uso interno de Coodetrans y no podra ser distribuida, comercializada o cedida a terceros sin autorizacion expresa.
+
 Todos los derechos de autor sobre el codigo fuente, documentacion tecnica y recursos asociados permanecen protegidos por la legislacion aplicable sobre propiedad intelectual.
+
 El software se proporciona "tal cual", sin garantias expresas o implicitas.
+
 RickLabs
 2026
