@@ -8,8 +8,11 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import Select from '../components/Select';
 import Modal from '../components/Modal';
+import AutoCompleteInput from '../components/AutoCompleteInput';
+import EntregasTable from '../components/EntregasTable';
 import { api } from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
+import { formatNombre, formatCedula, normalizarBusqueda } from '../utils/format';
 
 const PERIODOS = ['Abril', 'Agosto', 'Diciembre'];
 
@@ -43,6 +46,8 @@ export default function MovimientosPage() {
   // Filtros
   const [busqueda, setBusqueda] = useState('');
   const [filtroPeriodo, setFiltroPeriodo] = useState('');
+  const [filtroArea, setFiltroArea] = useState('');
+  const [filtroCargo, setFiltroCargo] = useState('');
 
   // Modal detalle
   const [detalleAbierto, setDetalleAbierto] = useState(false);
@@ -78,13 +83,20 @@ export default function MovimientosPage() {
   useEffect(() => { cargar(); }, []);
 
   const filtradas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
+    const q = normalizarBusqueda(busqueda);
     return entregas.filter((e) => {
       if (filtroPeriodo && e.periodo !== filtroPeriodo) return false;
-      if (q && !(`${e.empleado} ${e.cedula}`.toLowerCase().includes(q))) return false;
+      if (filtroArea && String(e.id_area) !== String(filtroArea)) return false;
+      if (filtroCargo && String(e.fk_id_cargo) !== String(filtroCargo)) return false;
+      if (q) {
+        const empleadoMatch = normalizarBusqueda(`${e.empleado} ${e.cedula}`).includes(q);
+        const areaMatch = normalizarBusqueda(e.nom_area || '').includes(q);
+        const cargoMatch = normalizarBusqueda(e.nom_cargo || '').includes(q);
+        if (!empleadoMatch && !areaMatch && !cargoMatch) return false;
+      }
       return true;
     });
-  }, [entregas, busqueda, filtroPeriodo]);
+  }, [entregas, busqueda, filtroPeriodo, filtroArea, filtroCargo]);
 
   /* ── Ver detalle ── */
   const verDetalle = async (e) => {
@@ -158,73 +170,94 @@ export default function MovimientosPage() {
 
   return (
     <div className="space-y-5">
-      {/* Barra de herramientas */}
+      {/* Barra de herramientas — Diseño mejorado */}
       <Card className="p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-          <div className="flex-1">
-            <Input icon={Search} placeholder="Buscar por empleado o cédula..."
-              value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Select value={filtroPeriodo} onChange={(e) => setFiltroPeriodo(e.target.value)}
-              className="min-w-[160px]">
-              <option value="">Todos los períodos</option>
+        {/* Búsqueda principal — ancho completo */}
+        <div className="mb-4">
+          <Input
+            icon={Search}
+            placeholder="Buscar por empleado, cédula, área o cargo..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="[&_input]:py-3 [&_input]:text-base"
+          />
+        </div>
+
+        {/* Filtros y acciones — Layout mejorado */}
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+          <div className="flex flex-wrap gap-2 flex-1">
+            <Select
+              value={filtroPeriodo}
+              onChange={(e) => setFiltroPeriodo(e.target.value)}
+              className="w-[140px]"
+              aria-label="Filtrar por período"
+            >
+              <option value="">Período</option>
               {PERIODOS.map((p) => <option key={p} value={p}>{p}</option>)}
             </Select>
-            <Button icon={Plus} onClick={abrirNueva}>Nueva entrega</Button>
+            <Select
+              value={filtroArea}
+              onChange={(e) => {
+                setFiltroArea(e.target.value);
+                setFiltroCargo('');
+              }}
+              className="w-[140px]"
+              aria-label="Filtrar por área"
+            >
+              <option value="">Área</option>
+              {Array.from(new Set(entregas.map((e) => e.nom_area).filter(Boolean))).map((area) => (
+                <option key={area} value={entregas.find((e) => e.nom_area === area)?.id_area || ''}>
+                  {area}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={filtroCargo}
+              onChange={(e) => setFiltroCargo(e.target.value)}
+              className="w-[140px]"
+              aria-label="Filtrar por cargo"
+              disabled={!filtroArea}
+            >
+              <option value="">Cargo</option>
+              {filtroArea && Array.from(new Set(
+                entregas
+                  .filter((e) => String(e.id_area) === String(filtroArea))
+                  .map((e) => e.nom_cargo)
+                  .filter(Boolean)
+              )).map((cargo) => (
+                <option key={cargo} value={entregas.find((e) => e.nom_cargo === cargo && String(e.id_area) === String(filtroArea))?.fk_id_cargo || ''}>
+                  {cargo}
+                </option>
+              ))}
+            </Select>
           </div>
+          <Button
+            icon={Plus}
+            onClick={abrirNueva}
+            className="w-full sm:w-auto"
+          >
+            Nueva entrega
+          </Button>
         </div>
+
+        {/* Contador de resultados */}
         <p className="text-xs text-muted mt-3">{filtradas.length} entrega(s)</p>
       </Card>
 
       {/* Tabla de entregas */}
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-edge bg-canvas/50">
-                {['Fecha', 'Período', 'Empleado', 'Artículos', 'Unidades', 'Registró', 'Detalle'].map((h) => (
-                  <th key={h} className="text-left font-semibold text-subtle text-xs uppercase
-                    tracking-wide px-4 py-3 whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtradas.length === 0 ? (
-                <tr><td colSpan={7} className="text-center text-muted py-10">
-                  No hay entregas registradas con los filtros aplicados.
-                </td></tr>
-              ) : filtradas.map((e) => (
-                <tr key={e.id_entrega} className="border-b border-edge/70 last:border-0
-                  hover:bg-canvas/60 transition-colors">
-                  <td className="px-4 py-3 text-ink">{fmt(e.fecha_entrega)}</td>
-                  <td className="px-4 py-3"><Badge tone="info">{e.periodo}</Badge></td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-ink-dark">{e.empleado}</p>
-                    <p className="text-xs text-muted">{e.cedula}</p>
-                  </td>
-                  <td className="px-4 py-3 text-ink">{e.items}</td>
-                  <td className="px-4 py-3 font-semibold text-ink-dark">{e.total_unidades}</td>
-                  <td className="px-4 py-3 text-muted">{e.usuario || '—'}</td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => verDetalle(e)} title="Ver detalle"
-                      className="grid place-items-center w-8 h-8 rounded-lg text-subtle
-                        hover:bg-primary-light hover:text-primary transition-colors">
-                      <Eye size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <EntregasTable
+          items={filtradas}
+          fmt={fmt}
+          onDetalle={verDetalle}
+        />
       </Card>
 
       {/* ── Modal: detalle de entrega ── */}
       <Modal
         open={detalleAbierto}
         onClose={() => setDetalleAbierto(false)}
-        title={`Detalle de entrega — ${entregaSel?.empleado || ''}`}
+        title={`Detalle de entrega — ${formatNombre(entregaSel?.empleado || '')}`}
         footer={<Button variant="secondary" onClick={() => setDetalleAbierto(false)}>Cerrar</Button>}
       >
         {cargandoDet ? (
@@ -274,20 +307,28 @@ export default function MovimientosPage() {
           <div className="mb-4 flex items-center gap-2 bg-danger-light text-danger text-sm
             rounded-lg px-3 py-2"><AlertTriangle size={16} /> {errorForm}</div>
         )}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Select label="Empleado *" value={form.fk_id_empleado} className="sm:col-span-1"
-            onChange={(e) => setForm((f) => ({ ...f, fk_id_empleado: e.target.value }))}>
-            <option value="">Seleccione...</option>
-            {empleados.map((e) => (
-              <option key={e.id_empleado} value={e.id_empleado}>{e.nombre_completo}</option>
-            ))}
-          </Select>
-          <Select label="Período *" value={form.periodo}
-            onChange={(e) => setForm((f) => ({ ...f, periodo: e.target.value }))}>
-            {PERIODOS.map((p) => <option key={p} value={p}>{p}</option>)}
-          </Select>
-          <Input type="date" label="Fecha de entrega *" value={form.fecha_entrega}
-            onChange={(e) => setForm((f) => ({ ...f, fecha_entrega: e.target.value }))} />
+        <div className="grid grid-cols-1 gap-4">
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-subtle">Empleado *</p>
+            <AutoCompleteInput
+              items={empleados}
+              value={form.fk_id_empleado}
+              onChange={(e) => setForm((f) => ({ ...f, fk_id_empleado: e.id_empleado }))}
+              getLabel={(e) => formatNombre(e.nombre_completo)}
+              filterFields={['nombre_completo', 'cedula', 'nom_area', 'nom_cargo']}
+              placeholder="Buscar empleado..."
+              searchPlaceholder="Buscar por nombre, cédula, área o cargo..."
+              allowFreeText={false}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Select label="Período *" value={form.periodo}
+              onChange={(e) => setForm((f) => ({ ...f, periodo: e.target.value }))}>
+              {PERIODOS.map((p) => <option key={p} value={p}>{p}</option>)}
+            </Select>
+            <Input type="date" label="Fecha de entrega *" value={form.fecha_entrega}
+              onChange={(e) => setForm((f) => ({ ...f, fecha_entrega: e.target.value }))} />
+          </div>
         </div>
 
         {/* Artículos */}
@@ -299,9 +340,9 @@ export default function MovimientosPage() {
           </div>
           <div className="space-y-2">
             {items.map((it, i) => (
-              <div key={i} className="flex items-end gap-2">
+              <div key={i} className="grid grid-cols-[1fr_5.5rem_2.5rem] items-end gap-2">
                 <Select label={i === 0 ? 'Variante' : undefined} value={it.fk_id_stock_variante}
-                  className="flex-1"
+                  className="min-w-0"
                   onChange={(e) => cambiarItem(i, 'fk_id_stock_variante', e.target.value)}>
                   <option value="">Seleccione un artículo...</option>
                   {variantes.map((v) => (
@@ -311,7 +352,7 @@ export default function MovimientosPage() {
                   ))}
                 </Select>
                 <Input inputMode="numeric" min="1" label={i === 0 ? 'Cant.' : undefined}
-                  className="w-20" value={it.cantidad}
+                  className="w-full" value={it.cantidad} placeholder="Ingrese cantidad"
                   onChange={(e) => cambiarItem(i, 'cantidad', e.target.value.replace(/[^\d]/g, ''))} />
                 <button onClick={() => quitarItem(i)} disabled={items.length === 1}
                   title="Quitar"

@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS talla (
     camisa      TEXT,
     pantalon    TEXT,
     calzado     TEXT,
+    general     TEXT,
     createdAt   TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     updatedAt   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
@@ -179,6 +180,7 @@ CREATE TABLE IF NOT EXISTS actividad_reciente (
 
 -- ------------------------------------------------------------
 -- ÍNDICES DE RENDIMIENTO PARA ACCESO ALFABÉTICO INMEDIATO
+-- Estos índices optimizan búsquedas comunes y filtros
 -- ------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_empleado_nombre ON empleado (nombre_completo);
 CREATE INDEX IF NOT EXISTS idx_empleado_estado ON empleado (estado);
@@ -186,3 +188,17 @@ CREATE INDEX IF NOT EXISTS idx_empleado_fk_area ON empleado (fk_id_area);
 CREATE INDEX IF NOT EXISTS idx_empleado_cedula ON empleado (cedula);
 CREATE INDEX IF NOT EXISTS idx_articulo_nombre ON articulo (nombre_item);
 CREATE INDEX IF NOT EXISTS idx_actividad_fecha ON actividad_reciente (fecha);
+
+-- Índices adicionales para optimización de queries comunes
+CREATE INDEX IF NOT EXISTS idx_area_estado ON area (estado);
+CREATE INDEX IF NOT EXISTS idx_cargo_fk_area ON cargo (fk_id_area);
+CREATE INDEX IF NOT EXISTS idx_cargo_estado ON cargo (estado);
+CREATE INDEX IF NOT EXISTS idx_usuario_username ON usuario (username);
+CREATE INDEX IF NOT EXISTS idx_usuario_estado ON usuario (estado);
+CREATE INDEX IF NOT EXISTS idx_articulo_fk_area ON articulo (fk_id_area);
+CREATE INDEX IF NOT EXISTS idx_articulo_talla_stock_fk_articulo ON articulo_talla_stock (fk_id_articulo);
+CREATE INDEX IF NOT EXISTS idx_entrega_dotacion_fk_empleado ON entrega_dotacion (fk_id_empleado);
+CREATE INDEX IF NOT EXISTS idx_entrega_dotacion_periodo ON entrega_dotacion (periodo);
+CREATE INDEX IF NOT EXISTS idx_entrega_dotacion_fecha ON entrega_dotacion (fecha_entrega);
+CREATE INDEX IF NOT EXISTS idx_detalle_entrega_fk_entrega ON detalle_entrega (fk_id_entrega);
+CREATE INDEX IF NOT EXISTS idx_actividad_reciente_fk_usuario ON actividad_reciente (fk_id_usuario);

@@ -283,6 +283,14 @@ const empleadoController = {
     }
   },
 
+  /** Normaliza fechas para evitar cruces entre ingreso y retiro. */
+  _normalizarFechas(d) {
+    const fecha_ingreso = d.fecha_ingreso || null;
+    let fecha_retiro = d.fecha_retiro || null;
+    if (d.estado === 'Activo') fecha_retiro = null;
+    return { ...d, fecha_ingreso, fecha_retiro };
+  },
+
   /** Valida y normaliza los datos del empleado antes de persistir. */
   _validar(d) {
     if (!d.cedula || !d.cedula.trim()) return 'La cédula es obligatoria.';
@@ -305,7 +313,7 @@ const empleadoController = {
       if (empleadoRepo.existeCedula(data.cedula.trim())) {
         return { ok: false, error: 'Ya existe un empleado con esa cédula.' };
       }
-      const id = empleadoRepo.crear({ ...data, cedula: data.cedula.trim() });
+      const id = empleadoRepo.crear(this._normalizarFechas({ ...data, cedula: data.cedula.trim() }));
       actividadRepo.registrar({
         accion: 'creacion',
         detalle: `Se registró la hoja de vida de ${data.nombre_completo.trim()}`,
@@ -324,7 +332,7 @@ const empleadoController = {
       if (empleadoRepo.existeCedula(data.cedula.trim(), id_empleado)) {
         return { ok: false, error: 'Ya existe otro empleado con esa cédula.' };
       }
-      const emp = empleadoRepo.actualizar(id_empleado, { ...data, cedula: data.cedula.trim() });
+      const emp = empleadoRepo.actualizar(id_empleado, this._normalizarFechas({ ...data, cedula: data.cedula.trim() }));
       actividadRepo.registrar({
         accion: 'actualizacion',
         detalle: `Se actualizó la hoja de vida de ${data.nombre_completo.trim()}`,

@@ -488,6 +488,10 @@ const articuloRepo = {
    * o la crea si no existe. Devuelve el id_talla.
    */
   buscarOCrearTalla({ camisa = null, pantalon = null, calzado = null }) {
+    const norm = (v) => (v ? String(v).toUpperCase() : null);
+    camisa = norm(camisa);
+    pantalon = norm(pantalon);
+    calzado = norm(calzado);
     const db = getDb();
     const existente = db
       .prepare(`
@@ -594,8 +598,8 @@ const entregaRepo = {
 
   /**
    * Lista las entregas de dotación con datos del empleado, usuario y un
-   * resumen de ítems entregados. Admite filtros opcionales por período y
-   * texto (cédula o nombre del empleado).
+   * resumen de ítems entregados. Incluye área y cargo del empleado para filtrado.
+   * Admite filtros opcionales por período y texto (cédula o nombre del empleado).
    */
   listar({ periodo = '', texto = '' } = {}) {
     const condiciones = [];
@@ -611,11 +615,18 @@ const entregaRepo = {
       .prepare(`
         SELECT ed.id_entrega, ed.fecha_entrega, ed.periodo,
                e.id_empleado, e.nombre_completo AS empleado, e.cedula,
+               e.fk_id_cargo,
+               c.nom_cargo,
+               COALESCE(ad.id_area, ac.id_area) AS id_area,
+               COALESCE(ad.nom_area, ac.nom_area) AS nom_area,
                u.username AS usuario,
                COUNT(de.id_detalle) AS items,
                COALESCE(SUM(de.cantidad), 0) AS total_unidades
         FROM entrega_dotacion ed
         JOIN empleado e ON e.id_empleado = ed.fk_id_empleado
+        LEFT JOIN cargo c ON c.id_cargo = e.fk_id_cargo
+        LEFT JOIN area ad ON ad.id_area = e.fk_id_area
+        LEFT JOIN area ac ON ac.id_area = c.fk_id_area
         LEFT JOIN usuario u ON u.id_usuario = ed.fk_id_usuario
         LEFT JOIN detalle_entrega de ON de.fk_id_entrega = ed.id_entrega
         ${where}

@@ -93,9 +93,9 @@ export const MOCK_VARIANTES = [
 ];
 
 export const MOCK_ENTREGAS = [
-  { id_entrega: 1, fecha_entrega: '2026-04-15', periodo: 'Abril', id_empleado: 1, empleado: 'Carlos Gómez', cedula: '79456123', usuario: 'admin', items: 2, total_unidades: 3 },
-  { id_entrega: 2, fecha_entrega: '2026-08-10', periodo: 'Agosto', id_empleado: 4, empleado: 'Andrés Morales', cedula: '80741258', usuario: 'admin', items: 1, total_unidades: 1 },
-  { id_entrega: 3, fecha_entrega: '2025-12-20', periodo: 'Diciembre', id_empleado: 4, empleado: 'Andrés Morales', cedula: '80741258', usuario: 'pcastillo', items: 3, total_unidades: 5 },
+  { id_entrega: 1, fecha_entrega: '2026-04-15', periodo: 'Abril', id_empleado: 1, empleado: 'Carlos Gómez', cedula: '79456123', fk_id_cargo: 4, nom_cargo: 'Conductor', id_area: 3, nom_area: 'Operativo', usuario: 'admin', items: 2, total_unidades: 3 },
+  { id_entrega: 2, fecha_entrega: '2026-08-10', periodo: 'Agosto', id_empleado: 4, empleado: 'Andrés Morales', cedula: '80741258', fk_id_cargo: 3, nom_cargo: 'Isleros', id_area: 2, nom_area: 'EDS (Estaciones de Servicio)', usuario: 'admin', items: 1, total_unidades: 1 },
+  { id_entrega: 3, fecha_entrega: '2025-12-20', periodo: 'Diciembre', id_empleado: 4, empleado: 'Andrés Morales', cedula: '80741258', fk_id_cargo: 3, nom_cargo: 'Isleros', id_area: 2, nom_area: 'EDS (Estaciones de Servicio)', usuario: 'pcastillo', items: 3, total_unidades: 5 },
 ];
 
 export const MOCK_DETALLE_ENTREGA = [

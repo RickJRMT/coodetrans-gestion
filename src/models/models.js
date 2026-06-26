@@ -14,7 +14,7 @@ const Entidades = {
   Area: ['id_area', 'nom_area'],
   Cargo: ['id_cargo', 'nom_cargo', 'fk_id_area'],
   UbicacionFisica: ['id_ubicacion', 'ubicacion_fisica'],
-  Talla: ['id_talla', 'camisa', 'pantalon', 'calzado'],
+  Talla: ['id_talla', 'camisa', 'pantalon', 'calzado', 'general'],
   Empleado: [
     'id_empleado', 'cedula', 'nombre_completo', 'genero', 'fecha_ingreso',
     'fecha_retiro', 'estado', 'observaciones', 'fk_id_cargo',
@@ -66,16 +66,17 @@ function resumenStockPorArea(articulos) {
 
 /**
  * Construye una etiqueta legible de la variante de talla a partir de los
- * campos camisa / pantalon / calzado. Omite valores vacíos o 'N/A'.
+ * campos camisa / pantalon / calzado / general. Omite valores vacíos o 'N/A'.
  *  - Ej.: { camisa:'M', pantalon:'32', calzado:'42' } -> 'C: M · P: 32 · Z: 42'
- *  - Ej.: { camisa:'Única' } -> 'Única'
+ *  - Ej.: { general:'Única' } -> 'Única'
  */
-function varianteLabel({ camisa, pantalon, calzado } = {}) {
+function varianteLabel({ camisa, pantalon, calzado, general } = {}) {
   const partes = [];
   const valido = (v) => v && v !== 'N/A';
   if (valido(camisa)) partes.push(`C: ${camisa}`);
   if (valido(pantalon)) partes.push(`P: ${pantalon}`);
   if (valido(calzado)) partes.push(`Z: ${calzado}`);
+  if (valido(general)) partes.push(`G: ${general}`);
   if (partes.length === 0) return 'Única';
   // Si solo hay una talla "Única", mostrarla limpia
   if (partes.length === 1 && /Única/i.test(partes[0])) return 'Única';

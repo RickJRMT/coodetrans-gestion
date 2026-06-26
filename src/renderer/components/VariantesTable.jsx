@@ -1,16 +1,23 @@
 import { useRef, useState } from 'react';
-import { MapPin, History, Pencil } from 'lucide-react';
+import { SlidersHorizontal, Trash2 } from 'lucide-react';
 import Badge from './Badge';
-import { formatCedula, formatNombre } from '../utils/format';
+import { formatNombre } from '../utils/format';
 
 const ROW_HEIGHT = 56;
 const BUFFER = 5;
 
 /**
- * Tabla de empleados con altura fija, scroll interno y renderizado virtual
+ * Tabla de variantes de inventario con altura fija, scroll interno y renderizado virtual
  * para mantener fluidez con grandes volúmenes de datos.
  */
-export default function EmpleadosTable({ items, onEdit, onHistory }) {
+export default function VariantesTable({
+  items,
+  TONO_ESTADO,
+  ETIQUETA_ESTADO,
+  fmtFecha,
+  onAjuste,
+  onDelete,
+}) {
   const scrollRef = useRef(null);
   const [scrollTop, setScrollTop] = useState(0);
   const containerHeight = 520;
@@ -22,7 +29,7 @@ export default function EmpleadosTable({ items, onEdit, onHistory }) {
   const paddingTop = startIndex * ROW_HEIGHT;
   const paddingBottom = Math.max(0, (items.length - endIndex) * ROW_HEIGHT);
 
-  const headers = ['Empleado', 'Cédula', 'Área / Cargo', 'Ubicación', 'Observaciones', 'Estado', 'Acciones'];
+  const headers = ['Artículo', 'Área', 'Variante', 'Stock actual', 'Stock mínimo', 'Estado', 'Actualizado', 'Acciones'];
 
   return (
     <div
@@ -47,65 +54,53 @@ export default function EmpleadosTable({ items, onEdit, onHistory }) {
         <tbody>
           {items.length === 0 ? (
             <tr>
-              <td colSpan={7} className="text-center text-muted py-10">
-                No se encontraron carpetas con los filtros aplicados.
+              <td colSpan={8} className="text-center text-muted py-10">
+                No se encontraron variantes con los filtros aplicados.
               </td>
             </tr>
           ) : (
             <>
               {paddingTop > 0 && (
                 <tr aria-hidden="true" style={{ height: paddingTop }}>
-                  <td colSpan={7} className="p-0 border-0" />
+                  <td colSpan={8} className="p-0 border-0" />
                 </tr>
               )}
-              {visibleItems.map((e) => (
+              {visibleItems.map((v) => (
                 <tr
-                  key={e.id_empleado}
+                  key={v.id_stock_variante}
                   className="border-b border-edge/70 last:border-0 hover:bg-canvas/60 transition-colors"
                   style={{ height: ROW_HEIGHT }}
                 >
                   <td className="px-4 py-3 align-middle">
-                    <p className="font-semibold text-ink-dark truncate">{formatNombre(e.nombre_completo)}</p>
-                    <p className="text-xs text-muted truncate">{e.genero || '—'}</p>
+                    <p className="font-semibold text-ink-dark truncate">{v.nombre_item}</p>
                   </td>
-                  <td className="px-4 py-3 text-ink align-middle font-mono text-xs">
-                    {formatCedula(e.cedula)}
-                  </td>
+                  <td className="px-4 py-3 text-ink align-middle truncate">{v.nom_area || '—'}</td>
                   <td className="px-4 py-3 align-middle">
-                    <p className="text-ink truncate">{e.nom_area || '—'}</p>
-                    <p className="text-xs text-muted truncate">{e.nom_cargo || 'Sin cargo'}</p>
+                    <Badge tone="neutral">{v.variante}</Badge>
                   </td>
+                  <td className="px-4 py-3 font-bold text-ink-dark align-middle">{v.stock_actual}</td>
+                  <td className="px-4 py-3 text-muted align-middle">{v.stock_minimo}</td>
                   <td className="px-4 py-3 align-middle">
-                    <span className="inline-flex items-center gap-1 text-ink truncate max-w-full">
-                      <MapPin size={14} className="text-muted shrink-0" />
-                      <span className="truncate">{e.ubicacion_fisica || '—'}</span>
-                    </span>
+                    <Badge tone={TONO_ESTADO[v.estado]} dot>{ETIQUETA_ESTADO[v.estado]}</Badge>
                   </td>
-                  <td className="px-4 py-3 align-middle">
-                    <span className="text-ink text-xs line-clamp-2" title={e.observaciones || ''}>
-                      {e.observaciones || '—'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 align-middle">
-                    <Badge tone={e.estado === 'Activo' ? 'ok' : 'neutral'} dot>{e.estado}</Badge>
-                  </td>
+                  <td className="px-4 py-3 text-xs text-muted align-middle whitespace-nowrap">{fmtFecha(v.updatedAt)}</td>
                   <td className="px-4 py-3 align-middle">
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => onHistory(e)}
-                        title="Ver historial de dotación"
+                        onClick={() => onAjuste(v)}
+                        title="Ajustar stock"
                         className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors"
                       >
-                        <History size={16} />
+                        <SlidersHorizontal size={16} />
                       </button>
                       <button
                         type="button"
-                        onClick={() => onEdit(e)}
-                        title="Editar carpeta"
-                        className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors"
+                        onClick={() => onDelete(v)}
+                        title="Eliminar variante"
+                        className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-danger-light hover:text-danger transition-colors"
                       >
-                        <Pencil size={16} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </td>
@@ -113,7 +108,7 @@ export default function EmpleadosTable({ items, onEdit, onHistory }) {
               ))}
               {paddingBottom > 0 && (
                 <tr aria-hidden="true" style={{ height: paddingBottom }}>
-                  <td colSpan={7} className="p-0 border-0" />
+                  <td colSpan={8} className="p-0 border-0" />
                 </tr>
               )}
             </>

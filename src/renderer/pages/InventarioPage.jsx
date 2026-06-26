@@ -9,17 +9,20 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import Select from '../components/Select';
 import Modal from '../components/Modal';
+import VariantesTable from '../components/VariantesTable';
 import { api } from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
+import { formatTalla } from '../utils/format';
 
 const TONO_ESTADO = { normal: 'ok', bajo: 'bajo', critico: 'critico' };
 const ETIQUETA_ESTADO = { normal: 'Normal', bajo: 'Bajo', critico: 'Crítico' };
 
-/* Categorías de talla y sus opciones (selector por categoría) */
+/** Categorías de talla (campo libre en mayúsculas). */
 const CATEGORIAS_TALLA = {
-  Camisa: { campo: 'camisa', tallas: ['S', 'M', 'L', 'XL'] },
-  Pantalón: { campo: 'pantalon', tallas: ['28', '30', '32', '34'] },
-  Zapato: { campo: 'calzado', tallas: ['37', '38', '39', '40'] },
+  Camisa: { campo: 'camisa', placeholder: 'S, M, L, XL, XXL...' },
+  Pantalón: { campo: 'pantalon', placeholder: '28, 30, 32, 34...' },
+  Zapato: { campo: 'calzado', placeholder: '37, 38, 39, 40...' },
+  General: { campo: 'general', placeholder: 'Única, Estándar, Personalizado...' },
 };
 
 const ART_VACIO = { nombre_item: '', fk_id_area: '', stock_minimo: '10', vencimiento: false };
@@ -210,17 +213,18 @@ export default function InventarioPage() {
   const guardarVar = async () => {
     setVarError('');
     if (!varForm.fk_id_articulo) return setVarError('Debe seleccionar una dotación.');
-    if (!varForm.talla) return setVarError('Debe seleccionar una talla.');
+    if (!varForm.talla.trim()) return setVarError('Debe indicar una talla.');
     if (varForm.stock_actual === '' || Number(varForm.stock_actual) < 0) {
       return setVarError('El stock debe ser un entero mayor o igual a 0.');
     }
     setVarGuardando(true);
     try {
       const campo = CATEGORIAS_TALLA[varForm.categoria].campo;
+      const tallaNorm = formatTalla(varForm.talla.trim());
       const datos = {
         fk_id_articulo: Number(varForm.fk_id_articulo),
         camisa: null, pantalon: null, calzado: null,
-        [campo]: varForm.talla,
+        [campo]: tallaNorm,
         stock_actual: Number(varForm.stock_actual),
       };
       const res = await api.inventario.crearVariante(datos, idUsuario);
@@ -285,7 +289,7 @@ export default function InventarioPage() {
     );
   }
 
-  const tallasDisponibles = CATEGORIAS_TALLA[varForm.categoria]?.tallas || [];
+  const categoriaTalla = CATEGORIAS_TALLA[varForm.categoria];
 
   return (
     <div className="space-y-5">
@@ -372,29 +376,55 @@ export default function InventarioPage() {
         </div>
       </Card>
 
-      {/* Filtros de variantes */}
+      {/* Filtros de variantes — Diseño mejorado */}
       <Card className="p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-          <div className="flex-1">
-            <Input icon={Search} placeholder="Buscar artículo o variante..."
-              value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Select value={filtroArea} onChange={(e) => setFiltroArea(e.target.value)}
-              className="min-w-[160px]">
-              <option value="">Todas las áreas</option>
+        {/* Búsqueda principal — ancho completo */}
+        <div className="mb-4">
+          <Input
+            icon={Search}
+            placeholder="Buscar artículo o variante..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="[&_input]:py-3 [&_input]:text-base"
+          />
+        </div>
+
+        {/* Filtros y acciones — Layout mejorado */}
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+          <div className="flex flex-wrap gap-2 flex-1">
+            <Select
+              value={filtroArea}
+              onChange={(e) => setFiltroArea(e.target.value)}
+              className="w-[140px]"
+              aria-label="Filtrar por área"
+            >
+              <option value="">Área</option>
               {areasFiltro.map((a) => <option key={a.id} value={a.id}>{a.nom}</option>)}
             </Select>
-            <Select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}
-              className="min-w-[150px]">
-              <option value="">Todos los estados</option>
+            <Select
+              value={filtroEstado}
+              onChange={(e) => setFiltroEstado(e.target.value)}
+              className="w-[140px]"
+              aria-label="Filtrar por estado"
+            >
+              <option value="">Estado</option>
               <option value="normal">Normal</option>
               <option value="bajo">Bajo</option>
               <option value="critico">Crítico</option>
             </Select>
-            <Button variant="secondary" icon={Plus} onClick={() => abrirVarNueva('')}>Nueva variante</Button>
           </div>
+          <Button
+            variant="secondary"
+            icon={Plus}
+            onClick={() => abrirVarNueva('')}
+            className="w-full sm:w-auto"
+          >
+            Nueva variante
+          </Button>
         </div>
+
+        {/* Contador de resultados */}
+        <p className="text-xs text-muted mt-3">{filtrados.length} variante(s)</p>
       </Card>
 
       {/* Tabla de variantes */}
@@ -408,57 +438,14 @@ export default function InventarioPage() {
             <p className="text-xs text-subtle">{filtrados.length} variante(s)</p>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-edge bg-canvas/50">
-                {['Artículo', 'Área', 'Variante', 'Stock actual', 'Stock mínimo', 'Estado', 'Actualizado', 'Acciones'].map((h) => (
-                  <th key={h} className="text-left font-semibold text-subtle text-xs uppercase
-                    tracking-wide px-4 py-3 whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtrados.length === 0 ? (
-                <tr><td colSpan={8} className="text-center text-muted py-10">
-                  No se encontraron variantes con los filtros aplicados.
-                </td></tr>
-              ) : filtrados.map((v) => (
-                <tr key={v.id_stock_variante} className="border-b border-edge/70 last:border-0
-                  hover:bg-canvas/60 transition-colors">
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-2 font-medium text-ink-dark">
-                      <PackageCheck size={15} className="text-muted" />{v.nombre_item}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-ink">{v.nom_area || '—'}</td>
-                  <td className="px-4 py-3"><Badge tone="neutral">{v.variante}</Badge></td>
-                  <td className="px-4 py-3 font-bold text-ink-dark">{v.stock_actual}</td>
-                  <td className="px-4 py-3 text-muted">{v.stock_minimo}</td>
-                  <td className="px-4 py-3">
-                    <Badge tone={TONO_ESTADO[v.estado]} dot>{ETIQUETA_ESTADO[v.estado]}</Badge>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted">{fmtFecha(v.updatedAt)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => abrirAjuste(v)} title="Ajustar stock"
-                        className="grid place-items-center w-8 h-8 rounded-lg text-subtle
-                          hover:bg-primary-light hover:text-primary transition-colors">
-                        <SlidersHorizontal size={16} />
-                      </button>
-                      <button onClick={() => setConfirmar({ tipo: 'variante', id: v.id_stock_variante, nombre: `${v.nombre_item} · ${v.variante}` })}
-                        title="Eliminar variante"
-                        className="grid place-items-center w-8 h-8 rounded-lg text-subtle
-                          hover:bg-danger-light hover:text-danger transition-colors">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <VariantesTable
+          items={filtrados}
+          TONO_ESTADO={TONO_ESTADO}
+          ETIQUETA_ESTADO={ETIQUETA_ESTADO}
+          fmtFecha={fmtFecha}
+          onAjuste={abrirAjuste}
+          onDelete={(v) => setConfirmar({ tipo: 'variante', id: v.id_stock_variante, nombre: `${v.nombre_item} · ${v.variante}` })}
+        />
       </Card>
 
       {/* ── Modal: artículo (crear / editar) ── */}
@@ -533,15 +520,13 @@ export default function InventarioPage() {
               onChange={(e) => setVarForm((f) => ({ ...f, categoria: e.target.value, talla: '' }))}>
               {Object.keys(CATEGORIAS_TALLA).map((c) => <option key={c} value={c}>{c}</option>)}
             </Select>
-            <Select label="Talla *" value={varForm.talla}
-              onChange={(e) => setVarForm((f) => ({ ...f, talla: e.target.value }))}>
-              <option value="">Seleccione...</option>
-              {tallasDisponibles.map((t) => <option key={t} value={t}>{t}</option>)}
-            </Select>
+            <Input label="Talla *" value={varForm.talla}
+              placeholder={categoriaTalla?.placeholder || 'Ingrese la talla'}
+              onChange={(e) => setVarForm((f) => ({ ...f, talla: formatTalla(e.target.value) }))} />
           </div>
           <Input label="Stock inicial *" inputMode="numeric" value={varForm.stock_actual}
             onChange={(e) => setVarForm((f) => ({ ...f, stock_actual: soloEnteros(e.target.value) }))}
-            placeholder="0" />
+            placeholder="Ingrese stock inicial" />
           <p className="text-xs text-muted">
             Si la combinación dotación + talla ya existe, el stock indicado se sumará al actual.
           </p>

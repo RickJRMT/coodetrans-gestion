@@ -40,7 +40,7 @@ pnpm-debug.log*
 *.db-shm
 *.db-wal
 
-# Copias de seguridad generadas por usuarios
+# Respaldos generados por la aplicación
 backups/
 backup/
 exports/
@@ -56,11 +56,11 @@ exports/
 # Electron Builder
 # =====================
 *.blockmap
-
-# Archivos generados por releases
 latest.yml
 latest-linux.yml
 latest-mac.yml
+builder-debug.yml
+builder-effective-config.yaml
 
 # =====================
 # Certificados de firma
@@ -102,7 +102,7 @@ Thumbs.db
 Desktop.ini
 
 # =====================
-# MacOS
+# macOS
 # =====================
 .DS_Store
 
@@ -116,8 +116,4 @@ Desktop.ini
 # =====================
 .github-token
 secrets.json
-
-# =====================
-# Electron Builder Env
-# =====================
 electron-builder.env

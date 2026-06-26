@@ -38,7 +38,7 @@ function getPasswordUsuarioInicial() {
 // Roles iniciales mínimos (administrables luego desde Configuración → Roles).
 const ROLES_INICIALES = [
   { nombre: 'Desarrollador', descripcion: 'Acceso total al sistema (RickLabs).' },
-  { nombre: 'Administrador', descripcion: 'Gestión completa de la operación.' },
+  { nombre: 'Admin', descripcion: 'Gestión completa de la operación.' },
 ];
 
 module.exports = {

@@ -16,6 +16,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import {
   empleadoCoincideBusqueda, formatCedula, formatTalla, sanitizeCedula,
+  capitalizarNombre, formatNombre,
 } from '../utils/format';
 
 const GENEROS = ['Masculino', 'Femenino', 'Otro'];
@@ -80,6 +81,7 @@ export default function CarpetasPage() {
   const busquedaDebounced = useDebouncedValue(busqueda, 180);
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroArea, setFiltroArea] = useState('');
+  const [filtroCargo, setFiltroCargo] = useState('');
 
   // Modal edición/creación
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -120,15 +122,22 @@ export default function CarpetasPage() {
     return empleados.filter((e) => {
       if (filtroEstado && e.estado !== filtroEstado) return false;
       if (filtroArea && String(e.id_area) !== String(filtroArea)) return false;
+      if (filtroCargo && String(e.fk_id_cargo) !== String(filtroCargo)) return false;
       if (!empleadoCoincideBusqueda(e, q)) return false;
       return true;
     });
-  }, [empleados, busquedaDebounced, filtroEstado, filtroArea]);
+  }, [empleados, busquedaDebounced, filtroEstado, filtroArea, filtroCargo]);
 
   // Cargos disponibles según el área seleccionada en el formulario
   const cargosForm = useMemo(
     () => cargos.filter((c) => String(c.fk_id_area) === String(form.id_area)),
     [cargos, form.id_area]
+  );
+
+  // Cargos disponibles para el filtro (si hay un área seleccionada)
+  const cargosFiltro = useMemo(
+    () => filtroArea ? cargos.filter((c) => String(c.fk_id_area) === String(filtroArea)) : cargos,
+    [cargos, filtroArea]
   );
 
   /* ── Abrir modal nuevo / editar ── */
@@ -142,7 +151,7 @@ export default function CarpetasPage() {
   const abrirEditar = (e) => {
     setEditando(e.id_empleado);
     setForm({
-      cedula: e.cedula || '', nombre_completo: e.nombre_completo || '',
+      cedula: e.cedula || '', nombre_completo: capitalizarNombre(e.nombre_completo) || '',
       genero: e.genero || 'Masculino', id_area: e.id_area || '',
       fk_id_cargo: e.fk_id_cargo || '', camisa: e.camisa || '',
       pantalon: e.pantalon || '', calzado: e.calzado || '',
@@ -158,9 +167,16 @@ export default function CarpetasPage() {
     setForm((f) => {
       let v = valor;
       if (campo === 'cedula') v = sanitizeCedula(valor);
-      if (['camisa', 'pantalon', 'calzado'].includes(campo)) v = formatTalla(valor);
+      if (campo === 'nombre_completo') {
+        v = capitalizarNombre(valor);
+      }
+      if (['camisa', 'pantalon', 'calzado'].includes(campo)) {
+        v = formatTalla(valor);
+      }
       const next = { ...f, [campo]: v };
-      if (campo === 'id_area') next.fk_id_cargo = '';
+      if (campo === 'id_area') {
+        next.fk_id_cargo = '';
+      }
       return next;
     });
   };
@@ -177,7 +193,7 @@ export default function CarpetasPage() {
     setGuardando(true);
     try {
       const datos = {
-        cedula: form.cedula, nombre_completo: form.nombre_completo,
+        cedula: form.cedula, nombre_completo: capitalizarNombre(form.nombre_completo),
         genero: form.genero, fk_id_area: form.id_area || null,
         fk_id_cargo: form.fk_id_cargo || null,
         camisa: form.camisa, pantalon: form.pantalon, calzado: form.calzado,
@@ -321,33 +337,88 @@ export default function CarpetasPage() {
 
   return (
     <div className="space-y-5">
-      {/* Barra de herramientas */}
+      {/* Barra de herramientas — Diseño mejorado */}
       <Card className="p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-          <div className="flex-1">
-            <Input
-              icon={Search}
-              placeholder="Buscar por nombre, cédula, ubicación u observaciones..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}
-              className="min-w-[150px]">
-              <option value="">Todos los estados</option>
+        {/* Búsqueda principal — ancho completo */}
+        <div className="mb-4">
+          <Input
+            icon={Search}
+            placeholder="Buscar por nombre, cédula, ubicación u observaciones..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="[&_input]:py-3 [&_input]:text-base"
+          />
+        </div>
+
+        {/* Filtros y acciones — Layout mejorado */}
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+          <div className="flex flex-wrap gap-2 flex-1">
+            <Select
+              value={filtroEstado}
+              onChange={(e) => setFiltroEstado(e.target.value)}
+              className="w-[120px]"
+              aria-label="Filtrar por estado"
+            >
+              <option value="">Estado</option>
               {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
             </Select>
-            <Select value={filtroArea} onChange={(e) => setFiltroArea(e.target.value)}
-              className="min-w-[160px]">
-              <option value="">Todas las áreas</option>
+            <Select
+              value={filtroArea}
+              onChange={(e) => {
+                setFiltroArea(e.target.value);
+                setFiltroCargo('');
+              }}
+              className="w-[120px]"
+              aria-label="Filtrar por área"
+            >
+              <option value="">Área</option>
               {areas.map((a) => <option key={a.id_area} value={a.id_area}>{a.nom_area}</option>)}
             </Select>
-            <Button variant="secondary" icon={Upload} onClick={abrirImportador}>Importar</Button>
-            <Button variant="secondary" icon={Download} onClick={() => { setMensajeExport(''); setExportAbierto(true); }}>Exportar</Button>
-            <Button icon={Plus} onClick={abrirNuevo}>Nueva carpeta</Button>
+            <Select
+              value={filtroCargo}
+              onChange={(e) => setFiltroCargo(e.target.value)}
+              className="w-[140px]"
+              aria-label="Filtrar por cargo"
+              disabled={!filtroArea}
+            >
+              <option value="">Cargo</option>
+              {cargosFiltro.map((c) => <option key={c.id_cargo} value={c.id_cargo}>{c.nom_cargo}</option>)}
+            </Select>
+          </div>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Upload}
+              onClick={abrirImportador}
+              className="flex-1 sm:flex-none"
+            >
+              Importar
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Download}
+              onClick={() => {
+                setMensajeExport('');
+                setExportAbierto(true);
+              }}
+              className="flex-1 sm:flex-none"
+            >
+              Exportar
+            </Button>
+            <Button
+              size="sm"
+              icon={Plus}
+              onClick={abrirNuevo}
+              className="flex-1 sm:flex-none"
+            >
+              Nueva carpeta
+            </Button>
           </div>
         </div>
+
+        {/* Contador de resultados */}
         <p className="text-xs text-muted mt-3">
           {filtrados.length} de {empleados.length} carpeta(s)
         </p>
@@ -372,7 +443,7 @@ export default function CarpetasPage() {
           <Card key={e.id_empleado} className="p-4">
             <div className="flex items-start justify-between mb-2">
               <div className="min-w-0">
-                <p className="font-semibold text-ink-dark truncate">{e.nombre_completo}</p>
+                <p className="font-semibold text-ink-dark truncate">{formatNombre(e.nombre_completo)}</p>
                 <p className="text-xs text-muted flex items-center gap-1">
                   <IdCard size={13} /> {formatCedula(e.cedula)}
                 </p>
@@ -460,19 +531,24 @@ export default function CarpetasPage() {
           </div>
         </div>
 
-        {/* Fechas y estado */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+        {/* Fechas y estado — ambas fechas siempre visibles */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
           <Input type="date" label="Fecha de ingreso" value={form.fecha_ingreso}
             onChange={(e) => cambiar('fecha_ingreso', e.target.value)} />
+          <Input type="date" label="Fecha de retiro" value={form.fecha_retiro}
+            onChange={(e) => cambiar('fecha_retiro', e.target.value)}
+            disabled={form.estado === 'Activo'}
+            title={form.estado === 'Activo' ? 'Disponible al marcar el empleado como Retirado' : undefined} />
           <Select label="Estado" value={form.estado}
             onChange={(e) => cambiar('estado', e.target.value)}>
             {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
           </Select>
-          {form.estado === 'Retirado' && (
-            <Input type="date" label="Fecha de retiro" value={form.fecha_retiro}
-              onChange={(e) => cambiar('fecha_retiro', e.target.value)} />
-          )}
         </div>
+        {form.estado === 'Retirado' && !form.fecha_retiro && (
+          <p className="text-xs text-warn mt-2 flex items-center gap-1">
+            <AlertTriangle size={13} /> Indique la fecha de retiro para empleados retirados.
+          </p>
+        )}
 
         <div className="mt-4">
           <label className="block text-xs font-medium text-subtle mb-1.5">Observaciones</label>
@@ -488,7 +564,7 @@ export default function CarpetasPage() {
       <Modal
         open={historialAbierto}
         onClose={() => setHistorialAbierto(false)}
-        title={`Historial de dotación — ${empleadoHist?.nombre_completo || ''}`}
+        title={`Historial de dotación — ${formatNombre(empleadoHist?.nombre_completo || '')}`}
         size="lg"
         footer={<Button variant="secondary" onClick={() => setHistorialAbierto(false)}>Cerrar</Button>}
       >
@@ -694,7 +770,7 @@ export default function CarpetasPage() {
                       {previa.filasValidas.map((f, i) => (
                         <tr key={i} className="border-b border-edge/60 last:border-0">
                           <td className="px-3 py-1.5 text-ink">{formatCedula(f.cedula)}</td>
-                          <td className="px-3 py-1.5 text-ink">{f.nombre_completo}</td>
+                          <td className="px-3 py-1.5 text-ink">{formatNombre(f.nombre_completo)}</td>
                           <td className="px-3 py-1.5 text-muted">{f.area || '—'}</td>
                           <td className="px-3 py-1.5 text-muted">{f.ubicacion_fisica || '—'}</td>
                           <td className="px-3 py-1.5 text-muted">{f.observaciones || '—'}</td>
@@ -718,7 +794,7 @@ export default function CarpetasPage() {
                 <div className="max-h-[160px] overflow-y-auto divide-y divide-edge/60">
                   {previa.filasInvalidas.map((f, i) => (
                     <div key={i} className="px-3 py-2 text-sm">
-                      <span className="text-ink">Fila {f.fila}: {f.nombre_completo || f.cedula || '(vacío)'}</span>
+                      <span className="text-ink">Fila {f.fila}: {formatNombre(f.nombre_completo) || formatCedula(f.cedula) || '(vacío)'}</span>
                       <span className="text-danger text-xs block">{f.motivo}</span>
                     </div>
                   ))}

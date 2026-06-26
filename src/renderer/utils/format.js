@@ -60,7 +60,7 @@ export function normalizarBusqueda(txt) {
 export function empleadoCoincideBusqueda(empleado, query) {
   if (!query || !query.trim()) return true;
   const q = normalizarBusqueda(query);
-
+  
   // Campos en los que buscar, incluyendo variantes
   const campos = [
     empleado.nombre_completo,
@@ -73,7 +73,7 @@ export function empleadoCoincideBusqueda(empleado, query) {
     empleado.genero,
     empleado.estado,
   ];
-
+  
   // Retornar true si la búsqueda coincide con ALGÚN campo
   return campos.some((c) => {
     if (!c) return false;
@@ -93,7 +93,7 @@ export function empleadoCoincideBusqueda(empleado, query) {
 export function coincideBusqueda(item, query, campos = []) {
   if (!query || !query.trim()) return true;
   if (campos.length === 0) return false;
-
+  
   const q = normalizarBusqueda(query);
   return campos.some((field) => {
     const valor = item[field];
