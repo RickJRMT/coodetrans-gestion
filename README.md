@@ -66,16 +66,16 @@ Desarrollado con Electron, React y SQLite, permitiendo operar completamente de f
 
 El proyecto sigue una arquitectura MVC adaptada a Electron.
 
-```text
-src/
-├── main/
-├── controllers/
-├── repositories/
-├── services/
-├── database/
-├── models/
-├── renderer/
-└── config/
+```
+└── 📁src
+    └── 📁config
+    └── 📁controllers
+    └── 📁database
+    └── 📁main
+    └── 📁models
+    └── 📁renderer
+    └── 📁repositories
+    └── 📁services
 ```
 
 ---
@@ -124,8 +124,8 @@ npm run build:installer
 
 Los archivos generados se almacenan en:
 
-```text
-dist/
+```
+└── 📁dist
 ```
 
 ---
