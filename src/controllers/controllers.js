@@ -439,6 +439,7 @@ const inventarioController = {
       if (errMin) return { ok: false, error: errMin };
       const r = articuloRepo.crearArticulo({
         nombre_item: data.nombre_item.trim(),
+        nombre_general: datos.nombre_general || null,
         stock_minimo: Number(data.stock_minimo),
         vencimiento: data.vencimiento ? 1 : 0,
         fk_id_area: data.fk_id_area || null,
@@ -462,6 +463,7 @@ const inventarioController = {
       if (errMin) return { ok: false, error: errMin };
       articuloRepo.actualizarArticulo(id_articulo, {
         nombre_item: data.nombre_item.trim(),
+        nombre_general: data.nombre_general || null,
         stock_minimo: Number(data.stock_minimo),
         vencimiento: data.vencimiento ? 1 : 0,
         fk_id_area: data.fk_id_area || null,
@@ -506,6 +508,7 @@ const inventarioController = {
         camisa: data.camisa || null,
         pantalon: data.pantalon || null,
         calzado: data.calzado || null,
+        general: data.general || null,
         stock_actual: Number(data.stock_actual),
       });
       actividadRepo.registrar({

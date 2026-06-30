@@ -24,14 +24,23 @@ npm run dev
 
 ## Estructura del proyecto
 
-src/
-├── controllers/
-├── database/
-├── main/
-├── models/
-├── renderer/
-├── repositories/
-└── services/
+```
+└── 📁src
+    └── 📁config
+    └── 📁controllers
+    └── 📁database
+    └── 📁main
+    └── 📁models
+    └── 📁renderer
+        └── 📁assets
+        └── 📁components
+        └── 📁hooks
+        └── 📁layouts
+        └── 📁pages
+        └── 📁utils
+    └── 📁repositories
+    └── 📁services
+```
 
 ## Convenciones
 

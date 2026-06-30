@@ -43,13 +43,14 @@ CREATE TABLE IF NOT EXISTS ubicacion_fisica (
 );
 
 CREATE TABLE IF NOT EXISTS talla (
-    id_talla    INTEGER PRIMARY KEY AUTOINCREMENT,
-    camisa      TEXT,
-    pantalon    TEXT,
-    calzado     TEXT,
-    general     TEXT,
-    createdAt   TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-    updatedAt   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    id_talla        INTEGER PRIMARY KEY AUTOINCREMENT,
+    camisa          TEXT,
+    pantalon        TEXT,
+    calzado         TEXT,
+    general         TEXT,
+    nombre_general  TEXT,
+    createdAt       TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    updatedAt       TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
 -- ------------------------------------------------------------
@@ -114,13 +115,14 @@ CREATE TABLE IF NOT EXISTS usuario (
 -- MÓDULO INVENTARIO Y MOVIMIENTOS
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS articulo (
-    id_articulo  INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre_item  TEXT NOT NULL,
-    stock_minimo INTEGER NOT NULL DEFAULT 10,
-    vencimiento  INTEGER NOT NULL DEFAULT 0,   -- 0 = No, 1 = Sí
-    fk_id_area   INTEGER,
-    createdAt    TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-    updatedAt    TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    id_articulo     INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre_item     TEXT NOT NULL,
+    nombre_general  TEXT,
+    stock_minimo    INTEGER NOT NULL DEFAULT 10,
+    vencimiento     INTEGER NOT NULL DEFAULT 0,   -- 0 = No, 1 = Sí
+    fk_id_area      INTEGER,
+    createdAt       TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    updatedAt       TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     FOREIGN KEY (fk_id_area) REFERENCES area (id_area)
         ON DELETE SET NULL ON UPDATE CASCADE
 );

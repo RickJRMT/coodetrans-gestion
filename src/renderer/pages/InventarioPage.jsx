@@ -26,7 +26,7 @@ const CATEGORIAS_TALLA = {
 };
 
 const ART_VACIO = { nombre_item: '', fk_id_area: '', stock_minimo: '10', vencimiento: false };
-const VAR_VACIA = { fk_id_articulo: '', categoria: 'Camisa', talla: '', stock_actual: '0' };
+const VAR_VACIA = { fk_id_articulo: '', categoria: 'Camisa', talla: '', nombre_general: '', stock_actual: '0' };
 
 function fmtFecha(iso) {
   if (!iso) return '—';
@@ -212,6 +212,9 @@ export default function InventarioPage() {
   };
   const guardarVar = async () => {
     setVarError('');
+    if (varForm.categoria === "General" && !varForm.nombre_general.trim()) {
+      return setVarError("Debe indicar el nombre de la prenda.");
+    }
     if (!varForm.fk_id_articulo) return setVarError('Debe seleccionar una dotación.');
     if (!varForm.talla.trim()) return setVarError('Debe indicar una talla.');
     if (varForm.stock_actual === '' || Number(varForm.stock_actual) < 0) {
@@ -224,6 +227,10 @@ export default function InventarioPage() {
       const datos = {
         fk_id_articulo: Number(varForm.fk_id_articulo),
         camisa: null, pantalon: null, calzado: null,
+        nombre_general:
+          varForm.categoria === "General"
+            ? varForm.nombre_general.trim()
+            : null,
         [campo]: tallaNorm,
         stock_actual: Number(varForm.stock_actual),
       };
@@ -520,12 +527,34 @@ export default function InventarioPage() {
               onChange={(e) => setVarForm((f) => ({ ...f, categoria: e.target.value, talla: '' }))}>
               {Object.keys(CATEGORIAS_TALLA).map((c) => <option key={c} value={c}>{c}</option>)}
             </Select>
+            {varForm.categoria === "General" && (
+              <Input
+                label="Nombre de la prenda *"
+                value={varForm.nombre_general}
+                placeholder="Ej.: Gorra, Casco, Chaleco..."
+                onChange={(e) =>
+                  setVarForm((f) => ({
+                    ...f,
+                    nombre_general: e.target.value,
+                  }))
+                }
+              />
+            )}
             <Input label="Talla *" value={varForm.talla}
               placeholder={categoriaTalla?.placeholder || 'Ingrese la talla'}
               onChange={(e) => setVarForm((f) => ({ ...f, talla: formatTalla(e.target.value) }))} />
           </div>
           <Input label="Stock inicial *" inputMode="numeric" value={varForm.stock_actual}
-            onChange={(e) => setVarForm((f) => ({ ...f, stock_actual: soloEnteros(e.target.value) }))}
+            onChange={(e) => {
+              const valor = soloEnteros(e.target.value);
+
+              if (Number(valor) <= 9999 || valor === "") {
+                setVarForm((f) => ({
+                  ...f,
+                  stock_actual: valor,
+                }));
+              }
+            }}
             placeholder="Ingrese stock inicial" />
           <p className="text-xs text-muted">
             Si la combinación dotación + talla ya existe, el stock indicado se sumará al actual.
