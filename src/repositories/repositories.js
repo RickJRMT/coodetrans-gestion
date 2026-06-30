@@ -381,7 +381,7 @@ const empleadoRepo = {
       .prepare(`
         SELECT ed.id_entrega, ed.fecha_entrega, ed.periodo,
                de.id_detalle, de.cantidad, de.talla_entregada,
-               ar.nombre_item, u.username AS usuario
+               ar.nombre_item, ar.nombre_general, u.username AS usuario
         FROM entrega_dotacion ed
         LEFT JOIN usuario u ON u.id_usuario = ed.fk_id_usuario
         LEFT JOIN detalle_entrega de ON de.fk_id_entrega = ed.id_entrega
@@ -451,7 +451,7 @@ const articuloRepo = {
       .prepare(`
         SELECT ats.id_stock_variante, ar.id_articulo, ar.nombre_item, ar.nombre_general,
                ar.stock_minimo, ar.vencimiento, ar.fk_id_area, a.nom_area,
-               t.camisa, t.pantalon, t.calzado,
+               t.camisa, t.pantalon, t.calzado, t.general, t.nombre_general,
                ats.stock_actual, ats.updatedAt
         FROM articulo_talla_stock ats
         JOIN articulo ar ON ar.id_articulo = ats.fk_id_articulo
@@ -487,12 +487,13 @@ const articuloRepo = {
    * Busca una talla existente con la combinación exacta camisa/pantalon/calzado
    * o la crea si no existe. Devuelve el id_talla.
    */
-  buscarOCrearTalla({ camisa = null, pantalon = null, calzado = null, general = null }) {
+  buscarOCrearTalla({ camisa = null, pantalon = null, calzado = null, general = null, nombre_general = null }) {
     const norm = (v) => (v ? String(v).toUpperCase() : null);
     camisa = norm(camisa);
     pantalon = norm(pantalon);
     calzado = norm(calzado);
     general = norm(general);
+    nombre_general = norm(nombre_general);
     const db = getDb();
     const existente = db
       .prepare(`
@@ -500,12 +501,19 @@ const articuloRepo = {
         WHERE IFNULL(camisa,'')   = IFNULL(?, '')
           AND IFNULL(pantalon,'') = IFNULL(?, '')
           AND IFNULL(calzado,'')  = IFNULL(?, '')
-          AND IFNULL(general, '') = IFNULL(?, '')`)
-      .get(camisa, pantalon, calzado, general);
+          AND IFNULL(general, '') = IFNULL(?, '')
+          AND IFNULL(nombre_general,'')  = IFNULL(?, '')`)
+      .get(camisa, pantalon, calzado, general, nombre_general);
     if (existente) return existente.id_talla;
     const r = db
-      .prepare('INSERT INTO talla (camisa, pantalon, calzado, general) VALUES (?, ?, ?, ?)')
-      .run(camisa, pantalon, calzado, general);
+      .prepare('INSERT INTO talla (camisa, pantalon, calzado, general, nombre_general) VALUES (?, ?, ?, ?, ?)')
+      .run(
+        camisa ? String(camisa).toUpperCase() : null,
+        pantalon ? String(pantalon).toUpperCase() : null,
+        calzado ? String(calzado).toUpperCase() : null,
+        general ? String(general).toUpperCase() : null,
+        nombre_general ? String(nombre_general).toUpperCase() : null
+      );
     return r.lastInsertRowid;
   },
 
@@ -513,7 +521,7 @@ const articuloRepo = {
     return getDb()
       .prepare(`
         INSERT INTO articulo (nombre_item, nombre_general, stock_minimo, vencimiento, fk_id_area)
-        VALUES (?, ?, ?, ?)`)
+        VALUES (?, ?, ?, ?, ?)`)
       .run(nombre_item, nombre_general, stock_minimo, vencimiento ? 1 : 0, fk_id_area || null);
   },
 
@@ -538,10 +546,10 @@ const articuloRepo = {
    * Crea (o reactiva) una variante de talla para un artículo. Si ya existe la
    * combinación artículo+talla, suma el stock indicado. Transaccional.
    */
-  crearVariante({ fk_id_articulo, camisa = null, pantalon = null, calzado = null, general = null, stock_actual = 0 }) {
+  crearVariante({ fk_id_articulo, camisa = null, pantalon = null, calzado = null, general = null, nombre_general = null, stock_actual = 0 }) {
     const db = getDb();
     const tx = db.transaction(() => {
-      const fk_id_talla = this.buscarOCrearTalla({ camisa, pantalon, calzado, general });
+      const fk_id_talla = this.buscarOCrearTalla({ camisa, pantalon, calzado, general, nombre_general });
       const existente = db
         .prepare('SELECT id_stock_variante FROM articulo_talla_stock WHERE fk_id_articulo = ? AND fk_id_talla = ?')
         .get(fk_id_articulo, fk_id_talla);
@@ -641,7 +649,7 @@ const entregaRepo = {
   detalle(id_entrega) {
     return getDb()
       .prepare(`
-        SELECT de.id_detalle, de.cantidad, de.talla_entregada, ar.nombre_item
+        SELECT de.id_detalle, de.cantidad, de.talla_entregada, ar.nombre_item, ar.nombre_general
         FROM detalle_entrega de
         LEFT JOIN articulo_talla_stock ats ON ats.id_stock_variante = de.fk_id_stock_variante
         LEFT JOIN articulo ar ON ar.id_articulo = ats.fk_id_articulo

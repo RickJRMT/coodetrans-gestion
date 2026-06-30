@@ -151,10 +151,19 @@ export default function InventarioPage() {
 
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
+
     return variantes.filter((v) => {
       if (filtroArea && String(v.fk_id_area) !== String(filtroArea)) return false;
       if (filtroEstado && v.estado !== filtroEstado) return false;
-      if (q && !(`${v.nombre_item} ${v.variante}`.toLowerCase().includes(q))) return false;
+      const nombreVisual = v.general && v.nombre_general
+        ? v.nombre_general
+        : v.variante;
+      if (
+        q &&
+        !(`${v.nombre_item} ${nombreVisual}`.toLowerCase().includes(q))
+      ) {
+        return false;
+      }
       return true;
     });
   }, [variantes, busqueda, filtroArea, filtroEstado]);
@@ -451,7 +460,16 @@ export default function InventarioPage() {
           ETIQUETA_ESTADO={ETIQUETA_ESTADO}
           fmtFecha={fmtFecha}
           onAjuste={abrirAjuste}
-          onDelete={(v) => setConfirmar({ tipo: 'variante', id: v.id_stock_variante, nombre: `${v.nombre_item} · ${v.variante}` })}
+          onDelete={(v) =>
+            setConfirmar({
+              tipo: 'variante',
+              id: v.id_stock_variante,
+              nombre: `${v.nombre_item} · ${v.general && v.nombre_general
+                  ? v.nombre_general
+                  : v.variante
+                }`
+            })
+          }
         />
       </Card>
 

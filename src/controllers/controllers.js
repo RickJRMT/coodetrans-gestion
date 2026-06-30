@@ -439,7 +439,7 @@ const inventarioController = {
       if (errMin) return { ok: false, error: errMin };
       const r = articuloRepo.crearArticulo({
         nombre_item: data.nombre_item.trim(),
-        nombre_general: datos.nombre_general || null,
+        nombre_general: data.nombre_general || null,
         stock_minimo: Number(data.stock_minimo),
         vencimiento: data.vencimiento ? 1 : 0,
         fk_id_area: data.fk_id_area || null,
@@ -498,7 +498,7 @@ const inventarioController = {
   crearVariante(data, idUsuario) {
     try {
       if (!data.fk_id_articulo) return { ok: false, error: 'Debe seleccionar una dotación.' };
-      if (!data.camisa && !data.pantalon && !data.calzado) {
+      if (!data.camisa && !data.pantalon && !data.calzado && !data.general) {
         return { ok: false, error: 'Debe indicar una talla para la variante.' };
       }
       const errStock = this._validarEntero(data.stock_actual, { minimo: 0, etiqueta: 'El stock' });
@@ -509,6 +509,7 @@ const inventarioController = {
         pantalon: data.pantalon || null,
         calzado: data.calzado || null,
         general: data.general || null,
+        nombre_general: data.nombre_general || null,
         stock_actual: Number(data.stock_actual),
       });
       actividadRepo.registrar({

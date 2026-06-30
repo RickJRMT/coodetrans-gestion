@@ -138,7 +138,13 @@ export default function MovimientosPage() {
         return {
           fk_id_stock_variante: Number(it.fk_id_stock_variante),
           cantidad: Number(it.cantidad),
-          talla_entregada: v ? v.variante : null,
+          talla_entregada: v
+            ? (
+              v.general && v.nombre_general
+                ? v.nombre_general
+                : v.variante
+            )
+            : null,
         };
       });
     if (!detalles.length) return setErrorForm('Agregue al menos un artículo con cantidad.');
@@ -277,7 +283,13 @@ export default function MovimientosPage() {
                     <span className="text-ink flex items-center gap-2">
                       <Truck size={14} className="text-muted" />{d.nombre_item}
                     </span>
-                    <span className="text-muted">Talla {d.talla_entregada || '—'} · x{d.cantidad}</span>
+                    <span className="text-muted">
+                      {
+                        d.talla_entregada?.includes('G:')
+                          ? (d.nombre_general || d.talla_entregada.replace('G:', '').trim())
+                          : d.talla_entregada || '—'
+                      } · x{d.cantidad}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -347,7 +359,11 @@ export default function MovimientosPage() {
                   <option value="">Seleccione un artículo...</option>
                   {variantes.map((v) => (
                     <option key={v.id_stock_variante} value={v.id_stock_variante}>
-                      {v.nombre_item} — {v.variante} (stock: {v.stock_actual})
+                      {v.nombre_item} — {
+                        v.general && v.nombre_general
+                          ? v.nombre_general
+                          : v.variante
+                      } (stock: {v.stock_actual})
                     </option>
                   ))}
                 </Select>

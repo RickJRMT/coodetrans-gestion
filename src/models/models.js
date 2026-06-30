@@ -16,16 +16,64 @@ const Entidades = {
   UbicacionFisica: ['id_ubicacion', 'ubicacion_fisica'],
   Talla: ['id_talla', 'camisa', 'pantalon', 'calzado', 'general', 'nombre_general'],
   Empleado: [
-    'id_empleado', 'cedula', 'nombre_completo', 'genero', 'fecha_ingreso',
-    'fecha_retiro', 'estado', 'observaciones', 'fk_id_cargo',
-    'fk_id_ubicacion', 'fk_id_talla',
+    'id_empleado',
+    'cedula',
+    'nombre_completo',
+    'genero',
+    'fecha_ingreso',
+    'fecha_retiro',
+    'estado',
+    'observaciones',
+    'fk_id_cargo',
+    'fk_id_ubicacion',
+    'fk_id_talla',
   ],
-  Usuario: ['id_usuario', 'username', 'rol', 'password', 'intentos_fallidos', 'ultimo_acceso', 'fk_id_empleado'],
-  Articulo: ['id_articulo', 'nombre_item', 'nombre_general', 'stock_minimo', 'vencimiento', 'fk_id_area'],
-  ArticuloTallaStock: ['id_stock_variante', 'fk_id_articulo', 'fk_id_talla', 'stock_actual'],
-  EntregaDotacion: ['id_entrega', 'fecha_entrega', 'periodo', 'fk_id_empleado', 'fk_id_usuario'],
-  DetalleEntrega: ['id_detalle', 'cantidad', 'talla_entregada', 'fk_id_entrega', 'fk_id_stock_variante'],
-  ActividadReciente: ['id_actividad', 'accion', 'detalle', 'entidad', 'fk_id_empleado', 'fk_id_usuario', 'fecha'],
+  Usuario: [
+    'id_usuario',
+    'username',
+    'rol',
+    'password',
+    'intentos_fallidos',
+    'ultimo_acceso',
+    'fk_id_empleado',
+  ],
+  Articulo: [
+    'id_articulo',
+    'nombre_item',
+    'nombre_general',
+    'stock_minimo',
+    'vencimiento',
+    'fk_id_area',
+  ],
+  ArticuloTallaStock: [
+    'id_stock_variante',
+    'fk_id_articulo',
+    'fk_id_talla',
+    'stock_actual',
+  ],
+  EntregaDotacion: [
+    'id_entrega',
+    'fecha_entrega',
+    'periodo',
+    'fk_id_empleado',
+    'fk_id_usuario',
+  ],
+  DetalleEntrega: [
+    'id_detalle',
+    'cantidad',
+    'talla_entregada',
+    'fk_id_entrega',
+    'fk_id_stock_variante',
+  ],
+  ActividadReciente: [
+    'id_actividad',
+    'accion',
+    'detalle',
+    'entidad',
+    'fk_id_empleado',
+    'fk_id_usuario',
+    'fecha',
+  ],
 };
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -52,34 +100,71 @@ function estadoStock(stockTotal, stockMinimo) {
  */
 function resumenStockPorArea(articulos) {
   const resumen = {};
+
   for (const art of articulos) {
     const area = art.nom_area || 'Uso General';
+
     if (!resumen[area]) {
-      resumen[area] = { area, normal: 0, bajo: 0, critico: 0, total: 0 };
+      resumen[area] = {
+        area,
+        normal: 0,
+        bajo: 0,
+        critico: 0,
+        total: 0,
+      };
     }
+
     const estado = estadoStock(art.stock_total, art.stock_minimo);
     resumen[area][estado] += 1;
     resumen[area].total += 1;
   }
+
   return resumen;
 }
 
 /**
- * Construye una etiqueta legible de la variante de talla a partir de los
- * campos camisa / pantalon / calzado / general. Omite valores vacíos o 'N/A'.
- *  - Ej.: { camisa:'M', pantalon:'32', calzado:'42' } -> 'C: M · P: 32 · Z: 42'
- *  - Ej.: { general:'Única' } -> 'Única'
+ * Construye una etiqueta legible de la variante de talla.
+ *
+ * Ejemplos:
+ *  { camisa:'M', pantalon:'32', calzado:'42' }
+ *   -> 'C: M · P: 32 · Z: 42'
+ *
+ *  { general:'ESTANDAR', nombre_general:'Uniforme Administración' }
+ *   -> 'Uniforme Administración'
+ *
+ *  { general:'Única' }
+ *   -> 'Única'
  */
-function varianteLabel({ camisa, pantalon, calzado, general } = {}) {
+function varianteLabel({
+  camisa,
+  pantalon,
+  calzado,
+  general,
+  nombre_general,
+} = {}) {
   const partes = [];
   const valido = (v) => v && v !== 'N/A';
+
   if (valido(camisa)) partes.push(`C: ${camisa}`);
   if (valido(pantalon)) partes.push(`P: ${pantalon}`);
   if (valido(calzado)) partes.push(`Z: ${calzado}`);
-  if (valido(general)) partes.push(`G: ${general}`);
+
+  // Si es categoría general, mostrar nombre descriptivo
+  if (valido(general)) {
+    partes.push(
+      nombre_general && nombre_general.trim()
+        ? nombre_general.trim()
+        : general
+    );
+  }
+
   if (partes.length === 0) return 'Única';
-  // Si solo hay una talla "Única", mostrarla limpia
-  if (partes.length === 1 && /Única/i.test(partes[0])) return 'Única';
+
+  // Si solo existe una talla "Única", mostrarla limpia
+  if (partes.length === 1 && /Única/i.test(partes[0])) {
+    return 'Única';
+  }
+
   return partes.join(' · ');
 }
 
