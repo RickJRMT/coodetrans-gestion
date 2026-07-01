@@ -502,7 +502,7 @@ export default function InventarioPage() {
             <option value="">Sin área específica</option>
             {areas.map((a) => <option key={a.id_area} value={a.id_area}>{a.nom_area}</option>)}
           </Select>
-          <Input label="Stock mínimo *" inputMode="numeric" value={artForm.stock_minimo}
+          <Input label="Stock mínimo *" inputMode="numeric" value={artForm.stock_minimo} maxLength={4}
             onChange={(e) => setArtForm((f) => ({ ...f, stock_minimo: soloEnteros(e.target.value) }))}
             placeholder="10" />
           <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">

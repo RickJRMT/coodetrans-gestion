@@ -493,7 +493,7 @@ export default function CarpetasPage() {
           </div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input label="Cédula *" value={form.cedula} inputMode="numeric"
+          <Input label="Cédula *" value={form.cedula} inputMode="numeric" maxlength={11}
             onChange={(e) => cambiar('cedula', e.target.value)}
             placeholder="Solo números" />
           <Input label="Nombre completo *" value={form.nombre_completo}
