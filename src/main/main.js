@@ -62,7 +62,8 @@ function cargarRenderer(win) {
     });
 
     intentarCarga();
-    if (process.env.NODE_ENV === 'development') {
+    // ✅ SEGURIDAD: DevTools solo en desarrollo (no en producción)
+    if (process.env.NODE_ENV === 'development' && !process.env.DISABLE_DEVTOOLS) {
       win.webContents.openDevTools({ mode: 'detach' });
     }
   } else {
@@ -85,7 +86,12 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
+      enableRemoteModule: false,
+      allowRunningInsecureContent: false,
+      webSecurity: true,
+      safeDialogs: true,
+      safeDialogsMessage: 'Diálogo de aplicación Coodetrans',
     },
   });
 
@@ -165,15 +171,20 @@ autoUpdater.on('checking-for-update', () => {
 autoUpdater.on('update-available', (info) => {
   console.log('[Updater] Actualización disponible:', info.version);
 
-  setTimeout(() => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
+  // ✅ SEGURIDAD: Validar información de actualización
+  if (info && typeof info.version === 'string') {
+    setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
 
-    mainWindow.webContents.send('update:available', {
-      version: info.version,
-      fecha: info.releaseDate,
-      notas: info.releaseNotes,
-    });
-  }, 1200);
+      mainWindow.webContents.send('update:available', {
+        version: info.version,
+        fecha: info.releaseDate || new Date().toISOString(),
+        notas: info.releaseNotes || '',
+      });
+    }, 1200);
+  } else {
+    console.warn('[Updater] Información de actualización inválida');
+  }
 });
 
 autoUpdater.on('update-not-available', () => {
@@ -183,13 +194,16 @@ autoUpdater.on('update-not-available', () => {
 autoUpdater.on('download-progress', (progressObj) => {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   
-  const progreso = Math.round((progressObj.transferred / progressObj.total) * 100);
-  mainWindow.webContents.send('update:download-progress', {
-    progreso,
-    velocidad: progressObj.bytesPerSecond,
-    descargados: progressObj.transferred,
-    total: progressObj.total,
-  });
+  // ✅ SEGURIDAD: Validar que el progreso sea confiable
+  if (typeof progressObj.transferred === 'number' && typeof progressObj.total === 'number' && progressObj.total > 0) {
+    const progreso = Math.round((progressObj.transferred / progressObj.total) * 100);
+    mainWindow.webContents.send('update:download-progress', {
+      progreso: Math.min(progreso, 100),
+      velocidad: progressObj.bytesPerSecond || 0,
+      descargados: progressObj.transferred,
+      total: progressObj.total,
+    });
+  }
 });
 
 autoUpdater.on('update-downloaded', (info) => {
