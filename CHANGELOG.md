@@ -161,18 +161,6 @@ Versión enfocada en **mejora de UX/UI**, **modernización del sistema de notifi
 
 ---
 
-### 📌 Documentación Incluida
-
-Se incluyen guías completas en la raíz del repositorio:
-
-- **IT_CORPORATIVO.md** - Whitelist, GPO, antivirus corporativo
-- **ALTERNATIVAS_EMPAQUETADO.md** - 5 opciones de distribución (EXE, ZIP, MSI, APPX)
-- **DEPLOYMENT.md** - Guía paso a paso compilación y distribución
-- **SEGURIDAD_RESUMEN_v1.0.9.md** - Resumen ejecutivo cambios
-- **scripts/build-with-hash.ps1** - Automatización compilación + hash SHA256
-
----
-
 ### 🚀 Recomendaciones
 
 1. **Distribución Recomendada**: ZIP Portable (~100 MB)
@@ -180,7 +168,7 @@ Se incluyen guías completas en la raíz del repositorio:
    - Usuario controla ubicación
    - Sin permisos de administrador requeridos
 
-2. **Para IT Corporativo**: Seguir `IT_CORPORATIVO.md`
+2. **Para IT Corporativo**:
    - Whitelist en Windows Defender
    - GPO para distribución masiva
    - Scripts de instalación silenciosa
