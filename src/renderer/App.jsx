@@ -7,6 +7,8 @@ import CarpetasPage from './pages/CarpetasPage';
 import InventarioPage from './pages/InventarioPage';
 import MovimientosPage from './pages/MovimientosPage';
 import ConfiguracionPage from './pages/ConfiguracionPage';
+import UpdateNotification from './components/UpdateNotification';
+import useUpdater from './hooks/useUpdater';
 import { useEffect } from 'react';
 
 /** Protege rutas privadas: redirige al login si no hay sesión. */
@@ -42,9 +44,20 @@ function Enrutador() {
 }
 
 export default function App() {
+  const updater = useUpdater();
+
   return (
     <AuthProvider>
       <Enrutador />
+      <UpdateNotification
+        estado={updater.estado}
+        version={updater.version}
+        progreso={updater.progreso}
+        velocidad={updater.velocidad}
+        error={updater.error}
+        onInstalar={updater.instalarActualizacion}
+        onCerrar={updater.cerrarNotificacion}
+      />
     </AuthProvider>
   );
 }

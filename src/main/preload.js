@@ -136,6 +136,32 @@ contextBridge.exposeInMainWorld('api', {
       };
     },
 
+    progreso: (callback) => {
+      const listener = (_, data) => callback(data);
+
+      ipcRenderer.on('update:download-progress', listener);
+
+      return () => {
+        ipcRenderer.removeListener(
+          'update:download-progress',
+          listener
+        );
+      };
+    },
+
+    error: (callback) => {
+      const listener = (_, data) => callback(data);
+
+      ipcRenderer.on('update:error', listener);
+
+      return () => {
+        ipcRenderer.removeListener(
+          'update:error',
+          listener
+        );
+      };
+    },
+
     instalar: () => invoke('update:install'),
   },
 });

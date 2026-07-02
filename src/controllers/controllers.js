@@ -480,14 +480,25 @@ const inventarioController = {
 
   eliminarArticulo(id_articulo, idUsuario) {
     try {
-      articuloRepo.eliminarArticulo(id_articulo);
+      const resultado = articuloRepo.eliminarArticulo(id_articulo);
+      if (resultado.changes === 0) {
+        return {
+          ok: false,
+          error: 'El artículo no existe.'
+        };
+      }
       actividadRepo.registrar({
-        accion: 'eliminacion', detalle: `Se eliminó una dotación (#${id_articulo})`,
-        entidad: 'articulo', fk_id_usuario: idUsuario || null,
+        accion: 'eliminacion',
+        detalle: `Se eliminó una dotación (#${id_articulo})`,
+        entidad: 'articulo',
+        fk_id_usuario: idUsuario || null,
       });
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: err.message };
+      return {
+        ok: false,
+        error: err.message
+      };
     }
   },
 
@@ -541,14 +552,25 @@ const inventarioController = {
 
   eliminarVariante(id_stock_variante, idUsuario) {
     try {
-      articuloRepo.eliminarVariante(id_stock_variante);
+      const resultado = articuloRepo.eliminarVariante(id_stock_variante);
+      if (resultado.changes === 0) {
+        return {
+          ok: false,
+          error: "La variante no existe."
+        };
+      }
       actividadRepo.registrar({
-        accion: 'eliminacion', detalle: `Se eliminó una variante de talla (#${id_stock_variante})`,
-        entidad: 'articulo', fk_id_usuario: idUsuario || null,
+        accion: 'eliminacion',
+        detalle: `Se eliminó una variante de talla (#${id_stock_variante})`,
+        entidad: 'articulo',
+        fk_id_usuario: idUsuario || null,
       });
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: err.message };
+      return {
+        ok: false,
+        error: err.message
+      };
     }
   },
 };
@@ -598,6 +620,31 @@ const movimientoController = {
       );
       if (!detalles.length) {
         return { ok: false, error: 'Debe agregar al menos un artículo con cantidad.' };
+      }
+
+      // Validacion de stock
+      const variantes = articuloRepo.listarVariantes();
+
+      for (const d of detalles) {
+        const variante = variantes.find(
+          v => Number(v.id_stock_variante) === Number(d.fk_id_stock_variante)
+        );
+        if (!variante) {
+          return {
+            ok: false,
+            error: 'El artículo seleccionado no existe.'
+          };
+        }
+
+        if (Number(d.cantidad) > Number(variante.stock_actual)) {
+          return {
+            ok: false,
+            error:
+              `No hay suficiente stock para "${variante.nombre_item}".
+              Disponible: ${variante.stock_actual}.
+              Solicitado: ${d.cantidad}.`
+          };
+        }
       }
 
       const id_entrega = entregaRepo.crear({
@@ -724,6 +771,7 @@ const usuarioController = {
    solo se realizan las operaciones de archivo con rutas ya resueltas.
 ─────────────────────────────────────────────────────────────────────── */
 const fs = require('fs');
+const { error } = require('console');
 const dbController = {
   /** Información del archivo de base de datos actual. */
   info() {

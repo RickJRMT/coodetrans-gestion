@@ -112,13 +112,15 @@ export default function InventarioPage() {
   // Modal ajustar stock
   const [stockAbierto, setStockAbierto] = useState(false);
   const [stockVariante, setStockVariante] = useState(null);
-  const [stockValor, setStockValor] = useState('0');
+  const [cantidadMovimiento, setCantidadMovimiento] = useState('');
+  const [tipoMovimiento, setTipoMovimiento] = useState('sumar');
   const [stockError, setStockError] = useState('');
   const [stockGuardando, setStockGuardando] = useState(false);
 
   // Modal confirmación de borrado
   const [confirmar, setConfirmar] = useState(null); // { tipo, id, nombre }
   const [borrando, setBorrando] = useState(false);
+  const [errorEliminar, setErrorEliminar] = useState('');
 
   const cargarDatos = async () => {
     setCargando(true);
@@ -257,40 +259,80 @@ export default function InventarioPage() {
   /* ── Ajustar stock de una variante ── */
   const abrirAjuste = (v) => {
     setStockVariante(v);
-    setStockValor(String(v.stock_actual ?? '0'));
+    setCantidadMovimiento('');
+    setTipoMovimiento('sumar');
     setStockError('');
     setStockAbierto(true);
   };
   const guardarStock = async () => {
     setStockError('');
-    if (stockValor === '' || Number(stockValor) < 0) {
-      return setStockError('El stock debe ser un entero mayor o igual a 0.');
-    }
-    setStockGuardando(true);
-    try {
-      const res = await api.inventario.ajustarStock(
-        { id_stock_variante: stockVariante.id_stock_variante, stock_actual: Number(stockValor) },
-        idUsuario
+    if (cantidadMovimiento === '' || Number(cantidadMovimiento) <= 0) {
+      return setStockError(
+        'La cantidad debe ser un número entero mayor que 0.'
       );
-      if (!res.ok) { setStockError(res.error); return; }
+    }
+    const cantidad = Number(cantidadMovimiento);
+
+    const nuevoStock =
+      tipoMovimiento === 'sumar'
+        ? Number(stockVariante.stock_actual) + cantidad
+        : Number(stockVariante.stock_actual) - cantidad;
+
+    if (nuevoStock < 0) {
+      return setStockError(
+        'No es posible descontar más unidades de las disponibles.'
+      );
+    }
+
+    setStockGuardando(true);
+
+    try {
+      const res = await api.inventario.ajustarStock({
+        id_stock_variante: stockVariante.id_stock_variante,
+        stock_actual: nuevoStock,
+      },
+        idUsuario);
+
+      if (!res.ok) {
+        setStockError(res.error);
+        return;
+      }
       setStockAbierto(false);
       await cargarDatos();
     } catch {
-      setStockError('No fue posible ajustar el stock.');
+      setStockError('No fue posible actualizar el stock.');
     } finally {
       setStockGuardando(false);
     }
+  };
+
+  const abrirConfimacion = (tipo, id, nombre) => {
+    setErrorEliminar('');
+    setConfirmar({
+      tipo,
+      id,
+      nombre,
+    });
   };
 
   /* ── Eliminar (artículo o variante) ── */
   const ejecutarBorrado = async () => {
     if (!confirmar) return;
     setBorrando(true);
+    setErrorEliminar('');
     try {
       const res = confirmar.tipo === 'articulo'
         ? await api.inventario.eliminarArticulo(confirmar.id, idUsuario)
         : await api.inventario.eliminarVariante(confirmar.id, idUsuario);
-      if (res.ok) { setConfirmar(null); await cargarDatos(); }
+      // Validacion
+      if (!res.ok) {
+        setErrorEliminar(res.error);
+        return;
+      }
+      setConfirmar(null);
+      await cargarDatos();
+    } catch {
+      setError("No fue posible eliminar el registro.");
     } finally {
       setBorrando(false);
     }
@@ -306,6 +348,13 @@ export default function InventarioPage() {
   }
 
   const categoriaTalla = CATEGORIAS_TALLA[varForm.categoria];
+
+  const stockResultante = stockVariante
+    ? (
+      tipoMovimiento === 'sumar'
+        ? Number(stockVariante.stock_actual) + Number(cantidadMovimiento || 0)
+        : Number(stockVariante.stock_actual) - Number(cantidadMovimiento || 0)
+    ) : 0;
 
   return (
     <div className="space-y-5">
@@ -377,7 +426,7 @@ export default function InventarioPage() {
                           hover:bg-primary-light hover:text-primary transition-colors">
                         <Pencil size={16} />
                       </button>
-                      <button onClick={() => setConfirmar({ tipo: 'articulo', id: a.id_articulo, nombre: a.nombre_item })}
+                      <button onClick={() => abrirConfimacion('articulo', a.id_articulo, a.nombre_item)}
                         title="Eliminar dotación"
                         className="grid place-items-center w-8 h-8 rounded-lg text-subtle
                           hover:bg-danger-light hover:text-danger transition-colors">
@@ -461,14 +510,14 @@ export default function InventarioPage() {
           fmtFecha={fmtFecha}
           onAjuste={abrirAjuste}
           onDelete={(v) =>
-            setConfirmar({
-              tipo: 'variante',
-              id: v.id_stock_variante,
-              nombre: `${v.nombre_item} · ${v.general && v.nombre_general
-                  ? v.nombre_general
-                  : v.variante
-                }`
-            })
+            abrirConfimacion(
+              'variante',
+              v.id_stock_variante,
+              `${v.nombre_item} · ${v.general && v.nombre_general
+                ? v.nombre_general
+                : v.variante
+              }`
+            )
           }
         />
       </Card>
@@ -476,7 +525,9 @@ export default function InventarioPage() {
       {/* ── Modal: artículo (crear / editar) ── */}
       <Modal
         open={artAbierto}
-        onClose={() => setArtAbierto(false)}
+        onClose={() => {
+          setArtAbierto(false);
+        }}
         title={artEditando ? 'Editar dotación' : 'Nueva dotación'}
         size="md"
         footer={
@@ -517,7 +568,9 @@ export default function InventarioPage() {
       {/* ── Modal: variante de talla ── */}
       <Modal
         open={varAbierto}
-        onClose={() => setVarAbierto(false)}
+        onClose={() => {
+          setVarAbierto(false);
+        }}
         title="Nueva variante de talla"
         size="md"
         footer={
@@ -583,14 +636,28 @@ export default function InventarioPage() {
       {/* ── Modal: ajustar stock ── */}
       <Modal
         open={stockAbierto}
-        onClose={() => setStockAbierto(false)}
+        onClose={() => {
+          setStockAbierto(false);
+          setCantidadMovimiento('');
+          setTipoMovimiento('sumar');
+          setStockError('');
+          setStockVariante(null);
+        }}
         title="Ajustar stock"
         size="sm"
         footer={
           <>
             <Button variant="secondary" onClick={() => setStockAbierto(false)} disabled={stockGuardando}>Cancelar</Button>
-            <Button onClick={guardarStock} disabled={stockGuardando} icon={stockGuardando ? RefreshCw : undefined}>
-              {stockGuardando ? 'Guardando...' : 'Guardar'}
+            <Button
+              onClick={guardarStock}
+              disabled={stockGuardando}
+              icon={stockGuardando ? RefreshCw : undefined}
+            >
+              {stockGuardando
+                ? 'Guardando...'
+                : tipoMovimiento === 'sumar'
+                  ? 'Agregar stock'
+                  : 'Descontar stock'}
             </Button>
           </>
         }
@@ -605,8 +672,51 @@ export default function InventarioPage() {
             {stockVariante.nombre_item} · <span className="font-medium text-ink">{stockVariante.variante}</span>
           </p>
         )}
-        <Input label="Nuevo stock *" inputMode="numeric" value={stockValor}
-          onChange={(e) => setStockValor(soloEnteros(e.target.value))} placeholder="0" />
+        <p className="text-sm font-semibold mb-3">
+          Stock actual: {stockVariante?.stock_actual}
+        </p>
+        
+        <div className="mb-4 p-3 bg-primary-light/50 rounded-lg border border-primary/20">
+          <p className="text-xs text-primary-dark font-medium mb-2">Cómo funciona:</p>
+          <ol className="text-xs text-primary-dark/80 space-y-1 list-decimal list-inside">
+            <li>Ingresa la cantidad</li>
+            <li>Selecciona <span className="font-semibold">Agregar</span> o <span className="font-semibold">Descontar</span></li>
+            <li>Confirma con el botón correspondiente</li>
+          </ol>
+        </div>
+
+        <Input
+          label="Cantidad"
+          inputMode="numeric"
+          maxLength={4}
+          value={cantidadMovimiento}
+          onChange={(e) => setCantidadMovimiento(soloEnteros(e.target.value))}
+          placeholder="0"
+        />
+        <p className="mt-2 text-sm text-muted">
+          Stock resultante:{' '}
+          <span
+            className={`font-semibold ${stockResultante < 0 ? 'text-danger' : 'text-ink-dark'
+              }`}
+          >
+            {Math.max(0, stockResultante)}
+          </span>
+        </p>
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <Button
+            variant={tipoMovimiento === "sumar" ? "primary" : "secondary"}
+            onClick={() => setTipoMovimiento("sumar")}
+          >
+            + Agregar
+          </Button>
+
+          <Button
+            variant={tipoMovimiento === "restar" ? "danger" : "secondary"}
+            onClick={() => setTipoMovimiento("restar")}
+          >
+            - Descontar
+          </Button>
+        </div>
       </Modal>
 
       {/* ── Modal: confirmar borrado ── */}
@@ -625,6 +735,12 @@ export default function InventarioPage() {
           </>
         }
       >
+        {errorEliminar && (
+          <div className="mb-4 flex items-center gap-2 bg-danger-light text-danger text-sm rounded-lg px-3 py-2">
+            <AlertTriangle size={16} />
+            {errorEliminar}
+          </div>
+        )}
         <p className="text-sm text-ink">
           ¿Está seguro de eliminar {confirmar?.tipo === 'articulo' ? 'la dotación' : 'la variante'}{' '}
           <span className="font-semibold">{confirmar?.nombre}</span>?
@@ -635,6 +751,6 @@ export default function InventarioPage() {
           </p>
         )}
       </Modal>
-    </div>
+    </div >
   );
 }

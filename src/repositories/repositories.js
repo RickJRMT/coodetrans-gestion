@@ -536,10 +536,32 @@ const articuloRepo = {
   },
 
   eliminarArticulo(id_articulo) {
-    // Las variantes de stock se eliminan en cascada (ON DELETE CASCADE).
-    return getDb()
-      .prepare('DELETE FROM articulo WHERE id_articulo = ?')
-      .run(id_articulo);
+    const db = getDb();
+    // ¿Tiene movimientos?
+    const movimientos = db.prepare(`
+        SELECT COUNT(*) AS total
+        FROM detalle_entrega de
+        INNER JOIN articulo_talla_stock ats
+            ON ats.id_stock_variante = de.fk_id_stock_variante
+        WHERE ats.fk_id_articulo = ?
+    `).get(id_articulo);
+    if (movimientos.total > 0) {
+      throw new Error(
+        "No puede eliminar este artículo porque tiene entregas registradas."
+      );
+    }
+    // ¿Tiene stock?
+    const stock = db.prepare(`
+        SELECT COALESCE(SUM(stock_actual),0) AS total
+        FROM articulo_talla_stock
+        WHERE fk_id_articulo = ?
+    `).get(id_articulo);
+    if (stock.total > 0) {
+      throw new Error(
+        `No puede eliminar este artículo porque aún tiene ${stock.total} unidades en inventario.`
+      );
+    }
+    return db.prepare(`DELETE FROM articulo WHERE id_articulo = ?`).run(id_articulo);
   },
 
   /**
@@ -582,8 +604,38 @@ const articuloRepo = {
   },
 
   eliminarVariante(id_stock_variante) {
-    return getDb()
-      .prepare('DELETE FROM articulo_talla_stock WHERE id_stock_variante = ?')
+    const db = getDb();
+    // Validar si la variante ya fue utilizada en una entrega
+    const usados = db.prepare(`
+    SELECT COUNT(*) AS total
+    FROM detalle_entrega
+    WHERE fk_id_stock_variante = ?
+  `).get(id_stock_variante);
+    if (usados.total > 0) {
+      throw new Error(
+        "No es posible eliminar esta variante porque ya fue utilizada en una entrega."
+      );
+    }
+    // Validar si aún tiene stock disponible
+    const variante = db.prepare(`
+    SELECT stock_actual
+    FROM articulo_talla_stock
+    WHERE id_stock_variante = ?
+  `).get(id_stock_variante);
+    if (!variante) {
+      throw new Error("La variante no existe.");
+    }
+    if (Number(variante.stock_actual) > 0) {
+      throw new Error(
+        `No es posible eliminar la variante porque aún tiene ${variante.stock_actual} unidad(es) en inventario.`
+      );
+    }
+    // Eliminar la variante
+    return db
+      .prepare(`
+      DELETE FROM articulo_talla_stock
+      WHERE id_stock_variante = ?
+    `)
       .run(id_stock_variante);
   },
 };
@@ -676,14 +728,58 @@ const entregaRepo = {
       const stmtDet = db.prepare(`
         INSERT INTO detalle_entrega (cantidad, talla_entregada, fk_id_entrega, fk_id_stock_variante)
         VALUES (?, ?, ?, ?)`);
+      const stmtBuscarStock = db.prepare(`
+        SELECT ats.stock_actual,
+               ar.nombre_item
+        FROM articulo_talla_stock ats
+        INNER JOIN articulo ar
+           ON ar.id_articulo = ats.fk_id_articulo
+        WHERE ats.id_stock_variante = ?`);
       const stmtStock = db.prepare(`
         UPDATE articulo_talla_stock
         SET stock_actual = MAX(0, stock_actual - ?), updatedAt = datetime('now','localtime')
         WHERE id_stock_variante = ?`);
 
+      // Agrupar cantidades por variante
+      const cantidadesPorVariante = new Map();
+
       for (const d of detalles) {
-        stmtDet.run(d.cantidad, d.talla_entregada, id_entrega, d.fk_id_stock_variante);
-        stmtStock.run(d.cantidad, d.fk_id_stock_variante);
+        const id = Number(d.fk_id_stock_variante);
+        cantidadesPorVariante.set(
+          id,
+          (cantidadesPorVariante.get(id) || 0) + Number(d.cantidad)
+        );
+      }
+
+      for (const [idVariante, cantidadTotal] of cantidadesPorVariante) {
+
+        const articulo = stmtBuscarStock.get(idVariante);
+
+        if (!articulo) {
+          throw new Error("El artículo seleccionado no existe.");
+        }
+
+        if (cantidadTotal > Number(articulo.stock_actual)) {
+          throw new Error(
+            `No hay suficiente stock para "${articulo.nombre_item}". ` +
+            `Disponible: ${articulo.stock_actual}. ` +
+            `Solicitado: ${cantidadTotal}.`
+          );
+        }
+      }
+
+      for (const d of detalles) {
+        stmtDet.run(
+          d.cantidad,
+          d.talla_entregada,
+          id_entrega,
+          d.fk_id_stock_variante
+        );
+
+        stmtStock.run(
+          d.cantidad,
+          d.fk_id_stock_variante
+        );
       }
       return id_entrega;
     });

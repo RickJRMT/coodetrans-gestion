@@ -180,6 +180,18 @@ autoUpdater.on('update-not-available', () => {
   console.log('[Updater] No hay actualizaciones disponibles');
 });
 
+autoUpdater.on('download-progress', (progressObj) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  
+  const progreso = Math.round((progressObj.transferred / progressObj.total) * 100);
+  mainWindow.webContents.send('update:download-progress', {
+    progreso,
+    velocidad: progressObj.bytesPerSecond,
+    descargados: progressObj.transferred,
+    total: progressObj.total,
+  });
+});
+
 autoUpdater.on('update-downloaded', (info) => {
   console.log('[Updater] Actualización descargada:', info.version);
 
@@ -192,5 +204,10 @@ autoUpdater.on('update-downloaded', (info) => {
 
 autoUpdater.on('error', (err) => {
   console.error('[Updater] Error:', err);
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  
+  mainWindow.webContents.send('update:error', {
+    mensaje: err.message,
+  });
 });
 module.exports = { reiniciarTrasRestauracionBD, esModoDesarrollo };

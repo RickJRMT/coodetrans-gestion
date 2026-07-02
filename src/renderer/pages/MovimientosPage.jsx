@@ -124,9 +124,30 @@ export default function MovimientosPage() {
   const cambiarItem = (i, campo, valor) => {
     setItems((arr) => arr.map((it, idx) => (idx === i ? { ...it, [campo]: valor } : it)));
   };
-  const agregarItem = () => setItems((arr) => [...arr, { fk_id_stock_variante: '', cantidad: 1 }]);
+  const agregarItem = () => {
+    const disponibles = variantes.filter(
+      (v) =>
+        Number(v.stock_actual) > 0 &&
+        !items.some(
+          (i) => String(i.fk_id_stock_variante) === String(v.id_stock_variante)
+        )
+    );
+    if (!disponibles.length) {
+      setErrorForm("Todos los artículos disponibles ya fueron agregados.");
+      return;
+    }
+    setItems((arr) => [
+      ...arr,
+      { fk_id_stock_variante: '', cantidad: 1 }
+    ]);
+  };
   const quitarItem = (i) => setItems((arr) => arr.filter((_, idx) => idx !== i));
-
+  const variantesSeleccionadas = (indiceActual) => {
+    return items
+      .filter((_, index) => index !== indiceActual)
+      .map((item) => String(item.fk_id_stock_variante))
+      .filter(Boolean);
+  };
   const guardar = async () => {
     setErrorForm('');
     if (!form.fk_id_empleado) return setErrorForm('Seleccione un empleado.');
@@ -350,26 +371,84 @@ export default function MovimientosPage() {
               flex items-center gap-1.5"><PackagePlus size={14} /> Artículos a entregar</p>
             <Button size="sm" variant="secondary" icon={Plus} onClick={agregarItem}>Agregar</Button>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
             {items.map((it, i) => (
               <div key={i} className="grid grid-cols-[1fr_5.5rem_2.5rem] items-end gap-2">
                 <Select label={i === 0 ? 'Variante' : undefined} value={it.fk_id_stock_variante}
                   className="min-w-0"
-                  onChange={(e) => cambiarItem(i, 'fk_id_stock_variante', e.target.value)}>
+                  onChange={(e) => {
+                    const idVariante = e.target.value;
+                    const variante = variantes.find(
+                      v => String(v.id_stock_variante) === String(idVariante)
+                    );
+                    let cantidad = Number(it.cantidad) || 1;
+                    if (variante && cantidad > Number(variante.stock_actual)) {
+                      cantidad = Number(variante.stock_actual);
+                      setErrorForm(
+                        `La cantidad fue ajustada automáticamente al stock disponible (${variante.stock_actual}) para "${variante.nombre_item}".`
+                      );
+                    } else {
+                      setErrorForm('');
+                    }
+                    setItems((itemsActuales) =>
+                      itemsActuales.map((item, index) =>
+                        index === i
+                          ? {
+                            ...item,
+                            fk_id_stock_variante: idVariante,
+                            cantidad
+                          }
+                          : item
+                      )
+                    );
+                  }}>
                   <option value="">Seleccione un artículo...</option>
-                  {variantes.map((v) => (
-                    <option key={v.id_stock_variante} value={v.id_stock_variante}>
-                      {v.nombre_item} — {
-                        v.general && v.nombre_general
-                          ? v.nombre_general
-                          : v.variante
-                      } (stock: {v.stock_actual})
-                    </option>
-                  ))}
+                  {variantes
+                    .filter((v) => {
+                      // Ocultar artículos sin stock
+                      if (Number(v.stock_actual) <= 0) return false;
+                      // Variantes seleccionadas en otras filas
+                      const usadas = variantesSeleccionadas(i);
+                      // Permitir la que ya tiene esta fila
+                      if (String(v.id_stock_variante) === String(it.fk_id_stock_variante))
+                        return true;
+                      // Ocultar si ya fue elegida en otra fila
+                      return !usadas.includes(String(v.id_stock_variante));
+                    })
+                    .map((v) => (
+                      <option key={v.id_stock_variante} value={v.id_stock_variante}>
+                        {v.nombre_item} — {
+                          v.general && v.nombre_general
+                            ? v.nombre_general
+                            : v.variante
+                        } (stock: {v.stock_actual})
+                      </option>
+                    ))}
                 </Select>
                 <Input inputMode="numeric" min="1" label={i === 0 ? 'Cant.' : undefined}
-                  className="w-full" value={it.cantidad} placeholder="Ingrese cantidad"
-                  onChange={(e) => cambiarItem(i, 'cantidad', e.target.value.replace(/[^\d]/g, ''))} />
+                  className="w-full" value={it.cantidad} maxLength={2} placeholder="Ingrese cantidad"
+                  onChange={(e) => {
+                    const valor = Number(e.target.value.replace(/[^\d]/g, ''));
+                    const variante = variantes.find(
+                      v => String(v.id_stock_variante) === String(it.fk_id_stock_variante)
+                    );
+                    if (!variante) {
+                      cambiarItem(i, 'cantidad', valor);
+                      return;
+                    }
+                    const permitido = Math.min(
+                      valor,
+                      Number(variante.stock_actual)
+                    );
+                    if (valor > variante.stock_actual) {
+                      setErrorForm(
+                        `Solo hay ${variante.stock_actual} unidades disponibles para "${variante.nombre_item}".`
+                      );
+                    } else {
+                      setErrorForm('');
+                    }
+                    cambiarItem(i, 'cantidad', permitido);
+                  }} />
                 <button onClick={() => quitarItem(i)} disabled={items.length === 1}
                   title="Quitar"
                   className="grid place-items-center w-10 h-[42px] rounded-lg text-muted
