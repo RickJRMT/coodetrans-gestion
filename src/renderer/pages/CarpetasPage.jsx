@@ -1047,7 +1047,7 @@ export default function CarpetasPage() {
               <li>Cédula y Nombre son obligatorios para cada registro.</li>
               <li>Use las columnas de Área y Cargo si desea asignar ubicación y posición.</li>
               <li>Marque el estado como <strong>Activo</strong> o <strong>Retirado</strong>.</li>
-              <li>La plantilla incluye formato para tallas, fechas y observaciones.</li>
+              <li>La plantilla incluye formato para novedad, fechas y observaciones.</li>
               <li>Al descargarla, guárdela como .xlsx y abra en Excel o LibreOffice.</li>
             </ul>
           </div>
