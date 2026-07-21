@@ -67,7 +67,10 @@ export default function Layout() {
     navigate('/login', { replace: true });
   };
 
-  const iniciales = (usuario?.nombre_completo || usuario?.username || 'U')
+  const nombreMostrado = usuario?.username || usuario?.nombre_completo || 'Usuario';
+  const nombreCompletoMostrado = usuario?.nombre_completo || '';
+
+  const iniciales = nombreMostrado
     .split(' ')
     .map((p) => p[0])
     .slice(0, 2)
@@ -104,7 +107,7 @@ export default function Layout() {
               </span>
               <div className="text-left hidden sm:block">
                 <p className="text-sm font-semibold text-ink leading-tight">
-                  {usuario?.nombre_completo || usuario?.username}
+                  {nombreMostrado}
                 </p>
                 <p className="text-[11px] text-subtle leading-tight">{usuario?.rol}</p>
               </div>
@@ -117,8 +120,10 @@ export default function Layout() {
                 <div className="absolute right-0 mt-2 w-56 bg-white border border-edge
                   rounded-xl shadow-card-hover py-1.5 z-20 animate-fade-in">
                   <div className="px-4 py-2.5 border-b border-edge">
-                    <p className="text-sm font-semibold text-ink">{usuario?.nombre_completo}</p>
-                    <p className="text-xs text-subtle">@{usuario?.username}</p>
+                    <p className="text-sm font-semibold text-ink">{nombreMostrado}</p>
+                    {nombreCompletoMostrado && (
+                      <p className="text-xs text-subtle">{nombreCompletoMostrado}</p>
+                    )}
                   </div>
                   <button
                     onClick={cerrarSesion}

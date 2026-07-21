@@ -50,7 +50,7 @@ export default function LoginPage() {
           <img src={logo} alt="Coodetrans" className="w-12 h-12 object-contain" />
           <div>
             <p className="font-bold text-xl leading-tight">Coodetrans</p>
-            <p className="text-white/60 text-xs">Gestión Documental e Inventario</p>
+            <p className="text-white/60 text-xs">Gestión Administrativa</p>
           </div>
         </div>
 
