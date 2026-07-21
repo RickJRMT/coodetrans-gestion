@@ -12,6 +12,7 @@ import Modal from '../components/Modal';
 import VariantesTable from '../components/VariantesTable';
 import { api } from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { formatTalla } from '../utils/format';
 
 const TONO_ESTADO = { normal: 'ok', bajo: 'bajo', critico: 'critico' };
@@ -93,6 +94,7 @@ export default function InventarioPage() {
   const [error, setError] = useState('');
 
   const [busqueda, setBusqueda] = useState('');
+  const busquedaDebounced = useDebouncedValue(busqueda, 180);
   const [filtroArea, setFiltroArea] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
 
@@ -152,7 +154,7 @@ export default function InventarioPage() {
   }, [variantes]);
 
   const filtrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
+    const q = busquedaDebounced.trim().toLowerCase();
 
     return variantes.filter((v) => {
       if (filtroArea && String(v.fk_id_area) !== String(filtroArea)) return false;
@@ -168,7 +170,7 @@ export default function InventarioPage() {
       }
       return true;
     });
-  }, [variantes, busqueda, filtroArea, filtroEstado]);
+  }, [variantes, busquedaDebounced, filtroArea, filtroEstado]);
 
   /* ── Artículo: crear / editar ── */
   const abrirArtNuevo = () => {
@@ -443,7 +445,6 @@ export default function InventarioPage() {
 
       {/* Filtros de variantes — Diseño mejorado */}
       <Card className="p-4">
-        {/* Búsqueda principal — ancho completo */}
         <div className="mb-4">
           <Input
             icon={Search}
@@ -454,13 +455,12 @@ export default function InventarioPage() {
           />
         </div>
 
-        {/* Filtros y acciones — Layout mejorado */}
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-          <div className="flex flex-wrap gap-2 flex-1">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Select
               value={filtroArea}
               onChange={(e) => setFiltroArea(e.target.value)}
-              className="w-[140px]"
+              className="w-full max-w-[130px]"
               aria-label="Filtrar por área"
             >
               <option value="">Área</option>
@@ -469,7 +469,7 @@ export default function InventarioPage() {
             <Select
               value={filtroEstado}
               onChange={(e) => setFiltroEstado(e.target.value)}
-              className="w-[140px]"
+              className="w-full max-w-[130px]"
               aria-label="Filtrar por estado"
             >
               <option value="">Estado</option>
@@ -478,17 +478,18 @@ export default function InventarioPage() {
               <option value="critico">Crítico</option>
             </Select>
           </div>
-          <Button
-            variant="secondary"
-            icon={Plus}
-            onClick={() => abrirVarNueva('')}
-            className="w-full sm:w-auto"
-          >
-            Nueva variante
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              variant="secondary"
+              icon={Plus}
+              onClick={() => abrirVarNueva('')}
+              className="w-full sm:w-auto"
+            >
+              Nueva variante
+            </Button>
+          </div>
         </div>
 
-        {/* Contador de resultados */}
         <p className="text-xs text-muted mt-3">{filtrados.length} variante(s)</p>
       </Card>
 

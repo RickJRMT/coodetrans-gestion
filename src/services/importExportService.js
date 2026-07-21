@@ -691,12 +691,96 @@ function buscarOCrearCargo(db, nombre, idArea) {
   return r.lastInsertRowid;
 }
 
+function normalizarValorImport(valor) {
+  return valor == null ? '' : String(valor).trim();
+}
+
+function actualizarEmpleadoSiCambia(db, idEmpleado, fila, idArea, idCargo) {
+  const actual = db.prepare(`
+    SELECT nombre_completo, estado, ubicacion_fisica, observaciones,
+           fk_id_area, fk_id_cargo, fecha_ingreso, fecha_retiro
+      FROM empleado WHERE id_empleado = ?
+  `).get(idEmpleado);
+
+  if (!actual) return { cambiado: false };
+
+  const campos = [];
+  const params = [];
+
+  const nombreActual = normalizarValorImport(actual.nombre_completo);
+  const nombreNuevo = normalizarValorImport(fila.nombre_completo);
+  if (nombreActual !== nombreNuevo) {
+    campos.push('nombre_completo = ?');
+    params.push(nombreNuevo);
+  }
+
+  const estadoActual = normalizarValorImport(actual.estado);
+  const estadoNuevo = normalizarValorImport(fila.estado);
+  if (estadoActual !== estadoNuevo) {
+    campos.push('estado = ?');
+    params.push(estadoNuevo);
+  }
+
+  const ubicActual = normalizarValorImport(actual.ubicacion_fisica) || null;
+  const ubicNueva = normalizarValorImport(fila.ubicacion_fisica) || null;
+  if (ubicActual !== ubicNueva) {
+    campos.push('ubicacion_fisica = ?');
+    params.push(ubicNueva);
+  }
+
+  const obsActual = normalizarValorImport(actual.observaciones) || null;
+  const obsNueva = normalizarValorImport(fila.observaciones) || null;
+  if (obsActual !== obsNueva) {
+    campos.push('observaciones = ?');
+    params.push(obsNueva);
+  }
+
+  const areaActual = actual.fk_id_area == null ? null : actual.fk_id_area;
+  if (areaActual !== idArea) {
+    campos.push('fk_id_area = ?');
+    params.push(idArea);
+  }
+
+  const cargoActual = actual.fk_id_cargo == null ? null : actual.fk_id_cargo;
+  if (cargoActual !== idCargo) {
+    campos.push('fk_id_cargo = ?');
+    params.push(idCargo);
+  }
+
+  const ingresoActual = actual.fecha_ingreso || null;
+  const ingresoNuevo = fila.fecha_ingreso || null;
+  if (ingresoActual !== ingresoNuevo) {
+    campos.push('fecha_ingreso = ?');
+    params.push(ingresoNuevo);
+  }
+
+  const retiroActual = actual.fecha_retiro || null;
+  const retiroNuevo = fila.fecha_retiro || null;
+  if (retiroActual !== retiroNuevo) {
+    campos.push('fecha_retiro = ?');
+    params.push(retiroNuevo);
+  }
+
+  if (!campos.length) {
+    return { cambiado: false };
+  }
+
+  campos.push("updatedAt = datetime('now','localtime')");
+  const sql = `UPDATE empleado SET ${campos.join(', ')} WHERE id_empleado = ?`;
+  params.push(idEmpleado);
+  db.prepare(sql).run(...params);
+
+  return { cambiado: true };
+}
+
 function importarEmpleados(filasValidas, idUsuario = null) {
   const db = getDb();
   let insertados = 0;
   let actualizados = 0;
   const errores = [];
   const omitidos = [];
+  const actualizadosDetalle = [];
+  const insertadosDetalle = [];
 
   const tx = db.transaction(() => {
     for (const fila of filasValidas) {
@@ -716,19 +800,18 @@ function importarEmpleados(filasValidas, idUsuario = null) {
         const existente = db.prepare('SELECT id_empleado FROM empleado WHERE cedula = ?').get(fila.cedula);
 
         if (existente) {
-          db.prepare(`
-            UPDATE empleado SET
-              nombre_completo = ?, estado = ?, ubicacion_fisica = ?, observaciones = ?,
-              fk_id_area = ?, fk_id_cargo = ?,
-              fecha_ingreso = COALESCE(?, fecha_ingreso),
-              fecha_retiro = COALESCE(?, fecha_retiro), updatedAt = datetime('now','localtime')
-            WHERE id_empleado = ?`)
-            .run(
-              fila.nombre_completo, fila.estado, fila.ubicacion_fisica, fila.observaciones || null,
-              idArea, idCargo, fila.fecha_ingreso, fila.fecha_retiro,
-              existente.id_empleado
-            );
+          const resultado = actualizarEmpleadoSiCambia(db, existente.id_empleado, fila, idArea, idCargo);
+          if (!resultado.cambiado) {
+            omitidos.push({
+              cedula: fila.cedula,
+              nombre: fila.nombre_completo,
+              hoja: fila.hojaOrigen,
+              motivo: 'Registro existente sin cambios.',
+            });
+            continue;
+          }
           actualizados++;
+          actualizadosDetalle.push({ cedula: fila.cedula, nombre: fila.nombre_completo, hoja: fila.hojaOrigen });
         } else {
           db.prepare(`
             INSERT INTO empleado
@@ -736,10 +819,18 @@ function importarEmpleados(filasValidas, idUsuario = null) {
                fk_id_cargo, fecha_ingreso, fecha_retiro)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(
-              fila.cedula, fila.nombre_completo, fila.estado, fila.ubicacion_fisica,
-              fila.observaciones || null, idArea, idCargo, fila.fecha_ingreso, fila.fecha_retiro
+              fila.cedula,
+              fila.nombre_completo,
+              fila.estado,
+              fila.ubicacion_fisica || null,
+              fila.observaciones || null,
+              idArea,
+              idCargo,
+              fila.fecha_ingreso,
+              fila.fecha_retiro,
             );
           insertados++;
+          insertadosDetalle.push({ cedula: fila.cedula, nombre: fila.nombre_completo, hoja: fila.hojaOrigen });
         }
       } catch (e) {
         errores.push({ cedula: fila.cedula, nombre: fila.nombre_completo, hoja: fila.hojaOrigen, motivo: e.message });
@@ -758,16 +849,21 @@ function importarEmpleados(filasValidas, idUsuario = null) {
     return {
       ok: true,
       data: {
+        registrosProcesados: filasValidas.length,
         insertados,
         actualizados,
-        errores,
         omitidos,
+        errores,
+        insertadosDetalle,
+        actualizadosDetalle,
         resumen: {
           registrosRecibidos: filasValidas.length,
+          registrosProcesados: filasValidas.length,
           registrosImportados: exitosos,
-          registrosOmitidos: omitidos.length + errores.length,
           insertados,
           actualizados,
+          omitidos: omitidos.length,
+          errores: errores.length,
         },
       },
     };
@@ -793,37 +889,66 @@ const COLUMNAS_EXPORT = [
   { clave: 'observaciones', encabezado: 'Observaciones' },
 ];
 
-function exportarEmpleados(filtro, formato, rutaDestino) {
+function exportarEmpleados(filtro, formato, rutaDestino, area = null, cargo = null, columnas = []) {
   try {
     const db = getDb();
-    let where = '';
-    if (filtro === 'activos') where = "WHERE e.estado = 'Activo'";
-    else if (filtro === 'retirados') where = "WHERE e.estado = 'Retirado'";
+    const columnasPermitidas = new Set(COLUMNAS_EXPORT.map((col) => col.clave));
+    const columnasValidas = Array.isArray(columnas)
+      ? columnas
+          .map((c) => String(c || '').trim())
+          .filter((c) => c && columnasPermitidas.has(c))
+      : [];
+    const columnasFinales = Array.from(new Set(['cedula', 'nombre_completo', ...columnasValidas]));
+    const columnasSeleccionadas = COLUMNAS_EXPORT.filter((c) => columnasFinales.includes(c.clave));
+
+    const COLUMNAS_QUERY = {
+      nom_area: "COALESCE(ad.nom_area, ac.nom_area, '') AS nom_area",
+      nom_cargo: "COALESCE(c.nom_cargo, '') AS nom_cargo",
+      genero: "COALESCE(e.genero, '') AS genero",
+      camisa: "COALESCE(t.camisa, '') AS camisa",
+      pantalon: "COALESCE(t.pantalon, '') AS pantalon",
+      calzado: "COALESCE(t.calzado, '') AS calzado",
+      estado: 'e.estado',
+      ubicacion_fisica: "COALESCE(e.ubicacion_fisica, '') AS ubicacion_fisica",
+      observaciones: "COALESCE(e.observaciones, '') AS observaciones",
+      cedula: 'e.cedula',
+      nombre_completo: 'e.nombre_completo',
+      fecha_ingreso: 'e.fecha_ingreso',
+      fecha_retiro: 'e.fecha_retiro',
+    };
+
+    const columnasQuery = columnasSeleccionadas
+      .map((col) => COLUMNAS_QUERY[col.clave])
+      .filter(Boolean);
+
+    if (!columnasQuery.length) {
+      return { ok: false, error: 'No hay columnas válidas para exportar.' };
+    }
+
+    let whereClauses = [];
+    if (filtro === 'activos') whereClauses.push("e.estado = 'Activo'");
+    else if (filtro === 'retirados') whereClauses.push("e.estado = 'Retirado'");
+    if (area) whereClauses.push('e.fk_id_area = ?');
+    if (cargo) whereClauses.push('e.fk_id_cargo = ?');
+
+    const where = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    const params = [];
+    if (area) params.push(area);
+    if (cargo) params.push(cargo);
 
     const filas = db.prepare(`
-      SELECT e.cedula,
-             e.nombre_completo,
-             COALESCE(ad.nom_area, ac.nom_area, '') AS nom_area,
-             COALESCE(c.nom_cargo, '') AS nom_cargo,
-             COALESCE(e.genero, '') AS genero,
-             COALESCE(t.camisa, '') AS camisa,
-             COALESCE(t.pantalon, '') AS pantalon,
-             COALESCE(t.calzado, '') AS calzado,
-             e.fecha_ingreso,
-             e.fecha_retiro,
-             e.estado,
-             COALESCE(e.ubicacion_fisica, '') AS ubicacion_fisica,
-             COALESCE(e.observaciones, '') AS observaciones
+      SELECT ${columnasQuery.join(', ')}
       FROM empleado e
       LEFT JOIN cargo c  ON c.id_cargo = e.fk_id_cargo
       LEFT JOIN area ad  ON ad.id_area = e.fk_id_area
       LEFT JOIN area ac  ON ac.id_area = c.fk_id_area
       LEFT JOIN talla t  ON t.id_talla = e.fk_id_talla
       ${where}
-      ORDER BY COALESCE(ad.nom_area, ac.nom_area, ''), e.nombre_completo ASC`).all();
+      ORDER BY COALESCE(ad.nom_area, ac.nom_area, ''), e.nombre_completo ASC`
+    ).all(...params);
 
-    const encabezados = COLUMNAS_EXPORT.map((c) => c.encabezado);
-    const datos = filas.map((fila) => COLUMNAS_EXPORT.map(({ clave }) => {
+    const encabezados = columnasSeleccionadas.map((c) => c.encabezado);
+    const datos = filas.map((fila) => columnasSeleccionadas.map(({ clave }) => {
       if (clave === 'fecha_ingreso') return formatearFechaExport(fila.fecha_ingreso);
       if (clave === 'fecha_retiro') return formatearFechaExport(fila.fecha_retiro);
       return fila[clave] ?? '';
@@ -835,12 +960,13 @@ function exportarEmpleados(filtro, formato, rutaDestino) {
 
     if (formato === 'csv') {
       const csv = XLSX.utils.sheet_to_csv(ws);
-      fs.writeFileSync(rutaDestino, '\ufeff' + csv, 'utf-8');
+      fs.writeFileSync(rutaDestino, '\ufeff' + csv, 'utf8');
     } else {
-      XLSX.writeFile(wb, rutaDestino, { bookType: 'xlsx' });
+      const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+      fs.writeFileSync(rutaDestino, buffer);
     }
 
-    return { ok: true, data: { total: filas.length, ruta: rutaDestino, filtro } };
+    return { ok: true, data: { total: filas.length, ruta: rutaDestino, filtro, area, cargo, columnas: columnasValidas } };
   } catch (err) {
     return { ok: false, error: err.message };
   }

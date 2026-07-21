@@ -1,6 +1,6 @@
 import { useState, version } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, LogIn, AlertCircle } from 'lucide-react';
+import { User, Lock, LogIn, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import logo from '../assets/coodetransLogo.png';
 import Input from '../components/Input';
 import Button from '../components/Button';
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [mostrarPassword, setMostrarPassword] = useState(false);
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
 
@@ -104,8 +105,11 @@ export default function LoginPage() {
             <Input
               label="Contraseña"
               name="password"
-              type="password"
+              type={mostrarPassword ? 'text' : 'password'}
               icon={Lock}
+              rightIcon={mostrarPassword ? EyeOff : Eye}
+              rightIconOnClick={() => setMostrarPassword((prev) => !prev)}
+              rightIconLabel={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

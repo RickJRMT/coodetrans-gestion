@@ -88,6 +88,7 @@ const mockApi = {
     previsualizar: () => demora({ ok: false, error: 'La importación solo está disponible en la app de escritorio.' }),
     confirmar: () => demora({ ok: false, error: 'La importación solo está disponible en la app de escritorio.' }),
     exportar: () => demora({ ok: false, error: 'La exportación solo está disponible en la app de escritorio.' }),
+    descargarPlantilla: () => demora({ ok: false, error: 'La descarga de plantilla solo está disponible en la app de escritorio.' }),
   },
   movimientos: {
     listar: () => demora({ ok: true, data: MOCK_DASHBOARD.actividades }),

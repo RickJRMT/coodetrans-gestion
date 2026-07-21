@@ -22,6 +22,22 @@ import {
 const GENEROS = ['Masculino', 'Femenino', 'Otro'];
 const ESTADOS = ['Activo', 'Retirado'];
 
+const EXPORT_FIELDS = [
+  { clave: 'cedula', label: 'Cédula' },
+  { clave: 'nombre_completo', label: 'Nombre' },
+  { clave: 'nom_area', label: 'Área' },
+  { clave: 'nom_cargo', label: 'Cargo' },
+  { clave: 'genero', label: 'Género' },
+  { clave: 'camisa', label: 'Talla Camisa' },
+  { clave: 'pantalon', label: 'Talla Pantalón' },
+  { clave: 'calzado', label: 'Talla Zapato' },
+  { clave: 'fecha_ingreso', label: 'Fecha Ingreso' },
+  { clave: 'fecha_retiro', label: 'Fecha Retiro' },
+  { clave: 'estado', label: 'Estado' },
+  { clave: 'ubicacion_fisica', label: 'Ubicación Física' },
+  { clave: 'observaciones', label: 'Observaciones' },
+];
+
 const FORM_VACIO = {
   cedula: '', nombre_completo: '', genero: 'Masculino', id_area: '',
   fk_id_cargo: '', camisa: '', pantalon: '', calzado: '',
@@ -69,12 +85,39 @@ export default function CarpetasPage() {
   const [errorImport, setErrorImport] = useState('');
   const [resultadoImport, setResultadoImport] = useState(null);
 
+  const importResumenAreas = useMemo(() => {
+    if (!previa?.filasValidas?.length) return { totalAreas: 0, detalle: [] };
+    const contador = {};
+    previa.filasValidas.forEach((fila) => {
+      const area = String(fila.area || 'Sin área').trim();
+      contador[area] = (contador[area] || 0) + 1;
+    });
+    return {
+      totalAreas: Object.keys(contador).length,
+      detalle: Object.entries(contador)
+        .sort((a, b) => b[1] - a[1])
+        .map(([area, cantidad]) => ({ area, cantidad })),
+    };
+  }, [previa]);
+
   // Exportación de empleados
   const [exportAbierto, setExportAbierto] = useState(false);
   const [exportFiltro, setExportFiltro] = useState('activos');
   const [exportFormato, setExportFormato] = useState('xlsx');
+  const [exportArea, setExportArea] = useState('');
+  const [exportCargo, setExportCargo] = useState('');
+  const [exportColumnas, setExportColumnas] = useState(['cedula', 'nombre_completo']);
   const [exportando, setExportando] = useState(false);
   const [mensajeExport, setMensajeExport] = useState('');
+  const [templateAbierto, setTemplateAbierto] = useState(false);
+  const [mensajeTemplate, setMensajeTemplate] = useState('');
+  const [descargandoTemplate, setDescargandoTemplate] = useState(false);
+
+  const cerrarTemplateModal = () => {
+    setTemplateAbierto(false);
+    setMensajeTemplate('');
+    setDescargandoTemplate(false);
+  };
 
   // Filtros
   const [busqueda, setBusqueda] = useState('');
@@ -138,6 +181,11 @@ export default function CarpetasPage() {
   const cargosFiltro = useMemo(
     () => filtroArea ? cargos.filter((c) => String(c.fk_id_area) === String(filtroArea)) : cargos,
     [cargos, filtroArea]
+  );
+
+  const exportCargos = useMemo(
+    () => exportArea ? cargos.filter((c) => String(c.fk_id_area) === String(exportArea)) : cargos,
+    [cargos, exportArea]
   );
 
   /* ── Abrir modal nuevo / editar ── */
@@ -313,7 +361,13 @@ export default function CarpetasPage() {
     setExportando(true);
     setMensajeExport('');
     try {
-      const res = await api.importExport.exportar(exportFiltro, exportFormato);
+      const res = await api.importExport.exportar(
+        exportFiltro,
+        exportFormato,
+        exportArea || null,
+        exportCargo || null,
+        exportColumnas
+      );
       if (!res.ok) {
         if (res.error && res.error !== 'Operación cancelada.') setMensajeExport(res.error);
         return;
@@ -323,6 +377,23 @@ export default function CarpetasPage() {
       setMensajeExport('No fue posible exportar el archivo.');
     } finally {
       setExportando(false);
+    }
+  };
+
+  const descargarPlantilla = async () => {
+    setDescargandoTemplate(true);
+    setMensajeTemplate('');
+    try {
+      const res = await api.importExport.descargarPlantilla();
+      if (!res.ok) {
+        if (res.error && res.error !== 'Operación cancelada.') setMensajeTemplate(res.error);
+        return;
+      }
+      setMensajeTemplate(`Plantilla descargada correctamente en:\n${res.data?.ruta || ''}`);
+    } catch (err) {
+      setMensajeTemplate(err?.message || 'No fue posible descargar la plantilla.');
+    } finally {
+      setDescargandoTemplate(false);
     }
   };
 
@@ -350,13 +421,13 @@ export default function CarpetasPage() {
           />
         </div>
 
-        {/* Filtros y acciones — Layout mejorado */}
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-          <div className="flex flex-wrap gap-2 flex-1">
+        {/* Filtros y acciones — Layout final para Control de Carpetas */}
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] items-end">
+          <div className="flex flex-wrap gap-2 items-end">
             <Select
               value={filtroEstado}
               onChange={(e) => setFiltroEstado(e.target.value)}
-              className="w-[120px]"
+              className="w-full sm:w-[140px]"
               aria-label="Filtrar por estado"
             >
               <option value="">Estado</option>
@@ -368,7 +439,7 @@ export default function CarpetasPage() {
                 setFiltroArea(e.target.value);
                 setFiltroCargo('');
               }}
-              className="w-[120px]"
+              className="w-full sm:w-[140px]"
               aria-label="Filtrar por área"
             >
               <option value="">Área</option>
@@ -377,7 +448,7 @@ export default function CarpetasPage() {
             <Select
               value={filtroCargo}
               onChange={(e) => setFiltroCargo(e.target.value)}
-              className="w-[140px]"
+              className="w-full sm:w-[140px]"
               aria-label="Filtrar por cargo"
               disabled={!filtroArea}
             >
@@ -385,15 +456,25 @@ export default function CarpetasPage() {
               {cargosFiltro.map((c) => <option key={c.id_cargo} value={c.id_cargo}>{c.nom_cargo}</option>)}
             </Select>
           </div>
-          <div className="flex gap-2 w-full sm:w-auto">
+
+          <div className="flex flex-wrap gap-2 justify-end">
             <Button
               variant="secondary"
               size="sm"
               icon={Upload}
               onClick={abrirImportador}
-              className="flex-1 sm:flex-none"
+              className="sm:w-auto"
             >
               Importar
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={FileSpreadsheet}
+              onClick={() => setTemplateAbierto(true)}
+              className="sm:w-auto"
+            >
+              Plantilla
             </Button>
             <Button
               variant="secondary"
@@ -403,7 +484,7 @@ export default function CarpetasPage() {
                 setMensajeExport('');
                 setExportAbierto(true);
               }}
-              className="flex-1 sm:flex-none"
+              className="sm:w-auto"
             >
               Exportar
             </Button>
@@ -411,7 +492,7 @@ export default function CarpetasPage() {
               size="sm"
               icon={Plus}
               onClick={abrirNuevo}
-              className="flex-1 sm:flex-none"
+              className="sm:w-auto"
             >
               Nueva carpeta
             </Button>
@@ -578,7 +659,11 @@ export default function CarpetasPage() {
             Este empleado aún no tiene entregas de dotación registradas.
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+            <div className="flex items-center justify-between text-sm text-muted">
+              <span>{historial.length} entrega(s) registradas</span>
+              <span>Desplácese para ver más</span>
+            </div>
             {historial.map((h) => (
               <div key={h.id_entrega} className="border border-edge rounded-lg overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-2.5 bg-canvas/60 border-b border-edge">
@@ -631,37 +716,131 @@ export default function CarpetasPage() {
 
         {/* Resultado de una importación finalizada */}
         {resultadoImport ? (
-          <div className="py-6 space-y-3">
+          <div className="py-6 space-y-4">
             <div className="text-center">
               <CheckCircle2 className="mx-auto mb-3 text-success" size={40} />
               <p className="text-ink-dark font-semibold mb-1">Importación completada</p>
+              <p className="text-sm text-muted">Resumen detallado de los resultados</p>
             </div>
             {resultadoImport.resumen && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-sm">
+              <div
+                className={`grid gap-2 text-center text-sm ${
+                  resultadoImport.resumen.omitidos || resultadoImport.resumen.errores
+                    ? 'grid-cols-2 sm:grid-cols-5'
+                    : 'grid-cols-3 sm:grid-cols-3'
+                }`}
+              >
                 <div className="p-2 bg-canvas rounded-lg">
-                  <p className="font-bold text-ink">{resultadoImport.resumen.registrosRecibidos}</p>
-                  <p className="text-xs text-muted">Recibidos</p>
+                  <p className="font-bold text-ink">{resultadoImport.resumen.registrosProcesados}</p>
+                  <p className="text-xs text-muted">Procesados</p>
                 </div>
                 <div className="p-2 bg-canvas rounded-lg">
-                  <p className="font-bold text-success">{resultadoImport.resumen.registrosImportados}</p>
-                  <p className="text-xs text-muted">Importados</p>
-                </div>
-                <div className="p-2 bg-canvas rounded-lg">
-                  <p className="font-bold text-primary">{resultadoImport.resumen.insertados}</p>
+                  <p className="font-bold text-success">{resultadoImport.resumen.insertados}</p>
                   <p className="text-xs text-muted">Nuevos</p>
                 </div>
                 <div className="p-2 bg-canvas rounded-lg">
-                  <p className="font-bold text-ink">{resultadoImport.resumen.actualizados}</p>
+                  <p className="font-bold text-primary">{resultadoImport.resumen.actualizados}</p>
                   <p className="text-xs text-muted">Actualizados</p>
                 </div>
+                {resultadoImport.resumen.omitidos > 0 && (
+                  <div className="p-2 bg-canvas rounded-lg">
+                    <p className="font-bold text-ink">{resultadoImport.resumen.omitidos}</p>
+                    <p className="text-xs text-muted">Omitidos</p>
+                  </div>
+                )}
+                {resultadoImport.resumen.errores > 0 && (
+                  <div className="p-2 bg-canvas rounded-lg">
+                    <p className="font-bold text-danger">{resultadoImport.resumen.errores}</p>
+                    <p className="text-xs text-muted">Errores</p>
+                  </div>
+                )}
               </div>
             )}
-            <p className="text-sm text-muted text-center">
-              {resultadoImport.insertados} nuevo(s) · {resultadoImport.actualizados} actualizado(s)
-              {(resultadoImport.omitidos?.length || resultadoImport.errores?.length)
-                ? ` · ${(resultadoImport.omitidos?.length || 0) + (resultadoImport.errores?.length || 0)} omitido(s)`
-                : ''}
-            </p>
+            {resultadoImport.resumen && !resultadoImport.resumen.omitidos && !resultadoImport.resumen.errores && (
+              <div className="rounded-lg border border-ok-light bg-ok-light/10 px-4 py-3 text-sm text-ok-dark">
+                Importación completada correctamente, sin registros omitidos ni errores.
+              </div>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="p-4 bg-canvas rounded-lg space-y-2">
+                <h3 className="text-sm font-semibold text-ink-dark">Nuevos agregados</h3>
+                {resultadoImport.insertadosDetalle?.length ? (
+                  <ul className="text-sm text-muted space-y-1 max-h-36 overflow-y-auto">
+                    {resultadoImport.insertadosDetalle.slice(0, 5).map((item, index) => (
+                      <li key={`nuevo-${index}`} className="flex items-center justify-between gap-2">
+                        <span>{item.nombre || item.cedula}</span>
+                        <span className="text-xs text-muted">{item.hoja}</span>
+                      </li>
+                    ))}
+                    {resultadoImport.insertadosDetalle.length > 5 && (
+                      <li className="text-xs text-muted">+{resultadoImport.insertadosDetalle.length - 5} más</li>
+                    )}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-muted">No se agregaron registros nuevos.</p>
+                )}
+              </div>
+              <div className="p-4 bg-canvas rounded-lg space-y-2">
+                <h3 className="text-sm font-semibold text-ink-dark">Actualizaciones</h3>
+                {resultadoImport.actualizadosDetalle?.length ? (
+                  <ul className="text-sm text-muted space-y-1 max-h-36 overflow-y-auto">
+                    {resultadoImport.actualizadosDetalle.slice(0, 5).map((item, index) => (
+                      <li key={`actualizado-${index}`} className="flex items-center justify-between gap-2">
+                        <span>{item.nombre || item.cedula}</span>
+                        <span className="text-xs text-muted">{item.hoja}</span>
+                      </li>
+                    ))}
+                    {resultadoImport.actualizadosDetalle.length > 5 && (
+                      <li className="text-xs text-muted">+{resultadoImport.actualizadosDetalle.length - 5} más</li>
+                    )}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-muted">No hubo actualizaciones.</p>
+                )}
+              </div>
+            </div>
+            {(resultadoImport.omitidos?.length > 0 || resultadoImport.errores?.length > 0) && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {resultadoImport.omitidos?.length > 0 && (
+                  <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-ink-dark">Omitidos</h3>
+                      <span className="text-xs text-ink">{resultadoImport.omitidos.length}</span>
+                    </div>
+                    <ul className="text-sm text-muted space-y-1 max-h-36 overflow-y-auto">
+                      {resultadoImport.omitidos.slice(0, 5).map((item, index) => (
+                        <li key={`omitido-${index}`} className="space-y-0.5">
+                          <span>{item.nombre || item.cedula}</span>
+                          <span className="text-xs text-muted">{item.motivo}</span>
+                        </li>
+                      ))}
+                      {resultadoImport.omitidos.length > 5 && (
+                        <li className="text-xs text-muted">+{resultadoImport.omitidos.length - 5} más</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+                {resultadoImport.errores?.length > 0 && (
+                  <div className="p-4 bg-danger-light/10 rounded-lg border border-danger/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-ink-dark">Errores</h3>
+                      <span className="text-xs text-ink">{resultadoImport.errores.length}</span>
+                    </div>
+                    <ul className="text-sm text-muted space-y-1 max-h-36 overflow-y-auto">
+                      {resultadoImport.errores.slice(0, 5).map((item, index) => (
+                        <li key={`error-${index}`} className="space-y-0.5">
+                          <span>{item.nombre || item.cedula}</span>
+                          <span className="text-xs text-danger">{item.motivo}</span>
+                        </li>
+                      ))}
+                      {resultadoImport.errores.length > 5 && (
+                        <li className="text-xs text-muted">+{resultadoImport.errores.length - 5} más</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : !previa ? (
           /* Paso 1: seleccionar archivo */
@@ -720,6 +899,42 @@ export default function CarpetasPage() {
                 </div>
               </div>
             )}
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="p-3 bg-canvas rounded-lg border border-edge/70">
+                <p className="text-xs text-muted uppercase tracking-wide mb-1">Columnas detectadas</p>
+                <p className="text-lg font-semibold text-ink-dark">{previa.columnas?.length || 0}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {previa.columnas?.slice(0, 6).map((col) => (
+                    <span key={col} className="rounded-full border border-edge px-2 py-1 text-[11px] text-muted">
+                      {col}
+                    </span>
+                  ))}
+                  {previa.columnas?.length > 6 && (
+                    <span className="text-[11px] text-muted">+{previa.columnas.length - 6}</span>
+                  )}
+                </div>
+              </div>
+              <div className="p-3 bg-canvas rounded-lg border border-edge/70">
+                <p className="text-xs text-muted uppercase tracking-wide mb-1">Áreas detectadas</p>
+                <p className="text-lg font-semibold text-ink-dark">{importResumenAreas.totalAreas}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {importResumenAreas.detalle.slice(0, 5).map((item) => (
+                    <span key={item.area} className="rounded-full bg-slate-100 px-2 py-1 text-[11px] text-muted">
+                      {item.area} ({item.cantidad})
+                    </span>
+                  ))}
+                  {importResumenAreas.detalle.length > 5 && (
+                    <span className="text-[11px] text-muted">+{importResumenAreas.detalle.length - 5} más</span>
+                  )}
+                </div>
+              </div>
+              <div className="p-3 bg-canvas rounded-lg border border-edge/70">
+                <p className="text-xs text-muted uppercase tracking-wide mb-1">Vista previa</p>
+                <p className="text-lg font-semibold text-ink-dark">{Math.min(previa.filasValidas.length, 5)} filas</p>
+                <p className="text-xs text-muted mt-2">Se importarán solo los registros válidos mostrados aquí.</p>
+              </div>
+            </div>
 
             {previa.multiHoja && previa.hojas?.length > 1 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-canvas/60 rounded-lg border border-edge">
@@ -805,6 +1020,45 @@ export default function CarpetasPage() {
         )}
       </Modal>
 
+      <Modal
+        open={templateAbierto}
+        onClose={cerrarTemplateModal}
+        title="Plantilla de importación"
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={cerrarTemplateModal} disabled={descargandoTemplate}>
+              Cerrar
+            </Button>
+            <Button onClick={descargarPlantilla} disabled={descargandoTemplate} icon={descargandoTemplate ? RefreshCw : FileDown}>
+              {descargandoTemplate ? 'Descargando...' : 'Descargar plantilla'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 text-sm text-ink">
+          <p>
+            Esta plantilla está diseñada para importar nuevos empleados o actualizar activos y retirados.
+            Use el archivo como guía para el orden y nombres de columnas requeridos.
+          </p>
+          <div className="rounded-lg border border-edge/70 bg-canvas/60 p-4">
+            <p className="font-semibold text-ink-dark mb-2">Qué contiene esta plantilla</p>
+            <ul className="list-disc list-inside space-y-2 text-sm text-muted">
+              <li>Cédula y Nombre son obligatorios para cada registro.</li>
+              <li>Use las columnas de Área y Cargo si desea asignar ubicación y posición.</li>
+              <li>Marque el estado como <strong>Activo</strong> o <strong>Retirado</strong>.</li>
+              <li>La plantilla incluye formato para tallas, fechas y observaciones.</li>
+              <li>Al descargarla, guárdela como .xlsx y abra en Excel o LibreOffice.</li>
+            </ul>
+          </div>
+          {mensajeTemplate && (
+            <div className="whitespace-pre-line rounded-lg border border-primary/30 bg-primary-light/40 p-3 text-sm text-primary">
+              {mensajeTemplate}
+            </div>
+          )}
+        </div>
+      </Modal>
+
       {/* ── Modal: exportar empleados ── */}
       <Modal
         open={exportAbierto}
@@ -824,17 +1078,66 @@ export default function CarpetasPage() {
         }
       >
         <div className="space-y-4">
-          <Select label="Empleados a exportar" value={exportFiltro}
-            onChange={(e) => setExportFiltro(e.target.value)}>
-            <option value="activos">Solo activos</option>
-            <option value="retirados">Solo retirados</option>
-            <option value="todos">Todos</option>
-          </Select>
-          <Select label="Formato de archivo" value={exportFormato}
-            onChange={(e) => setExportFormato(e.target.value)}>
-            <option value="xlsx">Excel (.xlsx)</option>
-            <option value="csv">CSV (.csv)</option>
-          </Select>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Select label="Empleados a exportar" value={exportFiltro}
+              onChange={(e) => setExportFiltro(e.target.value)}>
+              <option value="activos">Solo activos</option>
+              <option value="retirados">Solo retirados</option>
+              <option value="todos">Todos</option>
+            </Select>
+            <Select label="Formato de archivo" value={exportFormato}
+              onChange={(e) => setExportFormato(e.target.value)}>
+              <option value="xlsx">Excel (.xlsx)</option>
+              <option value="csv">CSV (.csv)</option>
+            </Select>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Select label="Área" value={exportArea}
+              onChange={(e) => {
+                setExportArea(e.target.value);
+                setExportCargo('');
+              }}>
+              <option value="">Todas las áreas</option>
+              {areas.map((a) => <option key={a.id_area} value={a.id_area}>{a.nom_area}</option>)}
+            </Select>
+            <Select label="Cargo" value={exportCargo}
+              onChange={(e) => setExportCargo(e.target.value)}
+              disabled={!exportArea}>
+              <option value="">Todos los cargos</option>
+              {exportCargos.map((c) => <option key={c.id_cargo} value={c.id_cargo}>{c.nom_cargo}</option>)}
+            </Select>
+          </div>
+          <div className="rounded-lg border border-edge/70 bg-canvas/60 p-3 text-sm text-muted">
+            <p className="font-semibold text-ink-dark mb-2">Campos a exportar</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {EXPORT_FIELDS.map(({ clave, label }) => {
+                const fijo = clave === 'cedula' || clave === 'nombre_completo';
+                return (
+                  <label key={clave} className="flex items-center gap-2 rounded-lg border border-edge/70 bg-white px-3 py-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-edge text-primary focus:ring-primary"
+                      checked={exportColumnas.includes(clave)}
+                      disabled={fijo}
+                      onChange={(e) => {
+                        if (fijo) return;
+                        const checked = e.target.checked;
+                        setExportColumnas((prev) => {
+                          if (checked) return Array.from(new Set([...prev, clave]));
+                          return prev.filter((item) => item !== clave);
+                        });
+                      }}
+                    />
+                    <span className="flex-1">{label}</span>
+                    {fijo && <span className="text-[11px] text-muted">Obligatorio</span>}
+                  </label>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted mt-3">
+              Cédula y nombre son obligatorios. Puede agregar columnas extras según su necesidad.
+            </p>
+          </div>
           {mensajeExport && (
             <div className="flex items-start gap-2 bg-primary-light text-primary text-sm rounded-lg px-3 py-2 whitespace-pre-line">
               <CheckCircle2 size={16} className="mt-0.5 shrink-0" /> {mensajeExport}

@@ -88,7 +88,8 @@ contextBridge.exposeInMainWorld('api', {
     seleccionarArchivo: () => invoke('import:seleccionar'),
     previsualizar: (ruta, opciones = {}) => invoke('import:previsualizar', { ruta, ...opciones }),
     confirmar: (filasValidas, idUsuario) => invoke('import:confirmar', { filasValidas, idUsuario }),
-    exportar: (filtro, formato) => invoke('export:empleados', { filtro, formato }),
+    exportar: (filtro, formato, area, cargo, columnas) => invoke('export:empleados', { filtro, formato, area, cargo, columnas }),
+    descargarPlantilla: () => invoke('template:download'),
   },
 
   // Base de datos (copia de seguridad / restauración)

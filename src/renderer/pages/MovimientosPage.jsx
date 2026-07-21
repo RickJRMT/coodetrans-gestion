@@ -12,6 +12,7 @@ import AutoCompleteInput from '../components/AutoCompleteInput';
 import EntregasTable from '../components/EntregasTable';
 import { api } from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { formatNombre, formatCedula, normalizarBusqueda } from '../utils/format';
 
 const PERIODOS = ['Abril', 'Agosto', 'Diciembre'];
@@ -45,6 +46,7 @@ export default function MovimientosPage() {
 
   // Filtros
   const [busqueda, setBusqueda] = useState('');
+  const busquedaDebounced = useDebouncedValue(busqueda, 180);
   const [filtroPeriodo, setFiltroPeriodo] = useState('');
   const [filtroArea, setFiltroArea] = useState('');
   const [filtroCargo, setFiltroCargo] = useState('');
@@ -83,7 +85,7 @@ export default function MovimientosPage() {
   useEffect(() => { cargar(); }, []);
 
   const filtradas = useMemo(() => {
-    const q = normalizarBusqueda(busqueda);
+    const q = normalizarBusqueda(busquedaDebounced);
     return entregas.filter((e) => {
       if (filtroPeriodo && e.periodo !== filtroPeriodo) return false;
       if (filtroArea && String(e.id_area) !== String(filtroArea)) return false;
@@ -96,7 +98,7 @@ export default function MovimientosPage() {
       }
       return true;
     });
-  }, [entregas, busqueda, filtroPeriodo, filtroArea, filtroCargo]);
+  }, [entregas, busquedaDebounced, filtroPeriodo, filtroArea, filtroCargo]);
 
   /* ── Ver detalle ── */
   const verDetalle = async (e) => {
@@ -199,7 +201,6 @@ export default function MovimientosPage() {
     <div className="space-y-5">
       {/* Barra de herramientas — Diseño mejorado */}
       <Card className="p-4">
-        {/* Búsqueda principal — ancho completo */}
         <div className="mb-4">
           <Input
             icon={Search}
@@ -210,13 +211,12 @@ export default function MovimientosPage() {
           />
         </div>
 
-        {/* Filtros y acciones — Layout mejorado */}
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-          <div className="flex flex-wrap gap-2 flex-1">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] items-end">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Select
               value={filtroPeriodo}
               onChange={(e) => setFiltroPeriodo(e.target.value)}
-              className="w-[140px]"
+              className="w-full max-w-[130px]"
               aria-label="Filtrar por período"
             >
               <option value="">Período</option>
@@ -228,7 +228,7 @@ export default function MovimientosPage() {
                 setFiltroArea(e.target.value);
                 setFiltroCargo('');
               }}
-              className="w-[140px]"
+              className="w-full max-w-[130px]"
               aria-label="Filtrar por área"
             >
               <option value="">Área</option>
@@ -241,7 +241,7 @@ export default function MovimientosPage() {
             <Select
               value={filtroCargo}
               onChange={(e) => setFiltroCargo(e.target.value)}
-              className="w-[140px]"
+              className="w-full max-w-[130px]"
               aria-label="Filtrar por cargo"
               disabled={!filtroArea}
             >
@@ -258,16 +258,17 @@ export default function MovimientosPage() {
               ))}
             </Select>
           </div>
-          <Button
-            icon={Plus}
-            onClick={abrirNueva}
-            className="w-full sm:w-auto"
-          >
-            Nueva entrega
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              icon={Plus}
+              onClick={abrirNueva}
+              className="w-full sm:w-auto"
+            >
+              Nueva entrega
+            </Button>
+          </div>
         </div>
 
-        {/* Contador de resultados */}
         <p className="text-xs text-muted mt-3">{filtradas.length} entrega(s)</p>
       </Card>
 

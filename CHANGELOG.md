@@ -4,6 +4,35 @@ Todas las versiones lanzadas del sistema de gestión de dotación de Coodetrans.
 
 ---
 
+## [1.1.1] - 2026-07-21
+
+### 🎯 Objetivo de la versión
+
+Versión enfocada en completar el flujo de plantilla de importación y mejorar las implementaciones de exportación/descarga de datos.
+
+### ✅ Cambios principales
+
+- Agregado modal de plantilla de importación con descarga directa desde la pantalla de Carpetas.
+- Se implementó descarga de `docs/plantilla-importacion-datos.xlsx` desde el proceso principal, igual que la exportación de datos.
+- Corrección de estado del modal para limpiar los mensajes al cerrarlo.
+- Ajustes UI/UX para mantener la plantilla y exportación alineadas con el flujo existente.
+
+---
+
+## [1.1.0] - 2026-07-20
+
+### 🎯 Objetivo de la versión
+
+Versión dedicada a introducir la plantilla de importación y su acceso seguro desde la aplicación.
+
+### ✅ Cambios principales
+
+- Se agregó el botón y modal de descarga de plantilla de importación en `CarpetasPage`.
+- Se añadió el soporte IPC para copiar la plantilla desde el paquete al destino elegido por el usuario.
+- Se validó la existencia del archivo `docs/plantilla-importacion-datos.xlsx` y se preparó su inclusión en la build.
+
+---
+
 ## [1.0.9] - 2026-07-02
 
 ### 🎯 Objetivo de la versión

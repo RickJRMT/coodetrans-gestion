@@ -8,6 +8,7 @@
  */
 
 const { ipcMain, dialog, BrowserWindow, app } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const {
   authController,
@@ -91,7 +92,7 @@ function registrarHandlersIPC({ reiniciarTrasRestauracionBD } = {}) {
   ipcMain.handle('import:confirmar', (_e, { filasValidas, idUsuario }) =>
     importExportController.confirmar(filasValidas, idUsuario));
 
-  ipcMain.handle('export:empleados', async (_e, { filtro = 'todos', formato = 'xlsx' } = {}) => {
+  ipcMain.handle('export:empleados', async (_e, { filtro = 'todos', formato = 'xlsx', area = null, cargo = null, columnas = [] } = {}) => {
     const win = BrowserWindow.getFocusedWindow();
     const fecha = new Date().toISOString().slice(0, 10);
     const ext = formato === 'csv' ? 'csv' : 'xlsx';
@@ -101,7 +102,33 @@ function registrarHandlersIPC({ reiniciarTrasRestauracionBD } = {}) {
       filters: [{ name: ext === 'csv' ? 'CSV' : 'Excel', extensions: [ext] }],
     });
     if (canceled || !filePath) return { ok: false, error: 'Operación cancelada.' };
-    return importExportController.exportar({ filtro, formato: ext, rutaDestino: filePath });
+    return importExportController.exportar({ filtro, formato: ext, rutaDestino: filePath, area, cargo, columnas });
+  });
+
+  ipcMain.handle('template:download', async () => {
+    const win = BrowserWindow.getFocusedWindow();
+    const nombreArchivo = 'plantilla-importacion-datos.xlsx';
+    const rutaPlantilla = app.isPackaged
+      ? path.join(process.resourcesPath, nombreArchivo)
+      : path.join(__dirname, '../../docs', nombreArchivo);
+
+    if (!fs.existsSync(rutaPlantilla)) {
+      return { ok: false, error: 'No se encontró la plantilla de importación.' };
+    }
+
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Guardar plantilla de importación',
+      defaultPath: path.join(app.getPath('documents'), nombreArchivo),
+      filters: [{ name: 'Excel', extensions: ['xlsx'] }],
+    });
+    if (canceled || !filePath) return { ok: false, error: 'Operación cancelada.' };
+
+    try {
+      fs.copyFileSync(rutaPlantilla, filePath);
+      return { ok: true, data: { ruta: filePath } };
+    } catch (err) {
+      return { ok: false, error: err.message || 'No fue posible copiar la plantilla.' };
+    }
   });
 
   /* ── Movimientos / entregas ── */

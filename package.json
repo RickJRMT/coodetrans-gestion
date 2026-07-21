@@ -25,7 +25,8 @@
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "prepare:icons": "node scripts/prepare-icons.js",
     "test:import": "node scripts/test-import-export.js",
-    "test:export": "node scripts/test-import-export.js"
+    "test:export": "node scripts/test-import-export.js",
+    "test:export:temp": "node scripts/temp-export-test.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
@@ -89,6 +90,10 @@
       {
         "from": "build/icon.png",
         "to": "icon.png"
+      },
+      {
+        "from": "docs/plantilla-importacion-datos.xlsx",
+        "to": "plantilla-importacion-datos.xlsx"
       }
     ],
     "asarUnpack": [

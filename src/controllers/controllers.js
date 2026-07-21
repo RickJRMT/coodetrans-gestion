@@ -921,10 +921,10 @@ const importExportController = {
   },
 
   /** Exporta empleados (activos/retirados/todos) a Excel o CSV. */
-  exportar({ filtro = 'todos', formato = 'xlsx', rutaDestino }) {
+  exportar({ filtro = 'todos', formato = 'xlsx', rutaDestino, area = null, cargo = null, columnas = [] }) {
     try {
       if (!rutaDestino) return { ok: false, error: 'Operación cancelada.' };
-      return importExportService.exportarEmpleados(filtro, formato, rutaDestino);
+      return importExportService.exportarEmpleados(filtro, formato, rutaDestino, area, cargo, columnas);
     } catch (err) {
       return { ok: false, error: err.message };
     }
