@@ -212,11 +212,11 @@ export default function MovimientosPage() {
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] items-end">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <div className="flex flex-wrap gap-2 items-end">
             <Select
               value={filtroPeriodo}
               onChange={(e) => setFiltroPeriodo(e.target.value)}
-              className="w-full max-w-[130px]"
+              className="w-full sm:w-[140px]"
               aria-label="Filtrar por período"
             >
               <option value="">Período</option>
@@ -228,7 +228,7 @@ export default function MovimientosPage() {
                 setFiltroArea(e.target.value);
                 setFiltroCargo('');
               }}
-              className="w-full max-w-[130px]"
+              className="w-full sm:w-[140px]"
               aria-label="Filtrar por área"
             >
               <option value="">Área</option>
@@ -241,7 +241,7 @@ export default function MovimientosPage() {
             <Select
               value={filtroCargo}
               onChange={(e) => setFiltroCargo(e.target.value)}
-              className="w-full max-w-[130px]"
+              className="w-full sm:w-[140px]"
               aria-label="Filtrar por cargo"
               disabled={!filtroArea}
             >
@@ -258,7 +258,7 @@ export default function MovimientosPage() {
               ))}
             </Select>
           </div>
-          <div className="flex justify-end">
+          <div className="flex flex-wrap gap-2 justify-end">
             <Button
               icon={Plus}
               onClick={abrirNueva}

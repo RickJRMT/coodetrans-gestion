@@ -254,6 +254,17 @@ function detectarColumnas(headers, filas = [], indiceEncabezado = 0) {
       if (mapa.cargo == null) mapa.cargo = i;
     }
 
+    // Género / Sexo
+    if (
+      n === 'genero' ||
+      n === 'género' ||
+      n === 'sexo' ||
+      n.includes('sexo') ||
+      n.includes('genero')
+    ) {
+      if (mapa.genero == null) mapa.genero = i;
+    }
+
     // Observaciones
     if (
       ['observaciones', 'observacion', 'notas', 'comentarios', 'nota'].includes(n) ||
@@ -425,6 +436,7 @@ function parsearFilasConEncabezado(filas, indiceEncabezado, nombreHoja) {
 
     const cedula = sanitizeCedula(get('codigo'));
     const nombre = get('nombre');
+    const genero = mapa.genero != null ? get('genero') : undefined;
     const area = get('area');
     const cargo = get('cargo');
     const ubicacion = get('ubicacion');
@@ -491,6 +503,7 @@ function parsearFilasConEncabezado(filas, indiceEncabezado, nombreHoja) {
       hojaOrigen: nombreHoja,
       cedula,
       nombre_completo: nombre,
+      genero: genero || null,
       area,
       cargo: cargo || null,
       ubicacion_fisica: ubicacion || null,
@@ -697,7 +710,7 @@ function normalizarValorImport(valor) {
 
 function actualizarEmpleadoSiCambia(db, idEmpleado, fila, idArea, idCargo) {
   const actual = db.prepare(`
-    SELECT nombre_completo, estado, ubicacion_fisica, observaciones,
+    SELECT nombre_completo, genero, estado, ubicacion_fisica, observaciones,
            fk_id_area, fk_id_cargo, fecha_ingreso, fecha_retiro
       FROM empleado WHERE id_empleado = ?
   `).get(idEmpleado);
@@ -719,6 +732,13 @@ function actualizarEmpleadoSiCambia(db, idEmpleado, fila, idArea, idCargo) {
   if (estadoActual !== estadoNuevo) {
     campos.push('estado = ?');
     params.push(estadoNuevo);
+  }
+
+  const generoActual = normalizarValorImport(actual.genero) || null;
+  const generoNuevo = fila.genero === undefined ? undefined : normalizarValorImport(fila.genero) || null;
+  if (generoNuevo !== undefined && generoActual !== generoNuevo) {
+    campos.push('genero = ?');
+    params.push(generoNuevo);
   }
 
   const ubicActual = normalizarValorImport(actual.ubicacion_fisica) || null;
@@ -815,12 +835,13 @@ function importarEmpleados(filasValidas, idUsuario = null) {
         } else {
           db.prepare(`
             INSERT INTO empleado
-              (cedula, nombre_completo, estado, ubicacion_fisica, observaciones, fk_id_area,
+              (cedula, nombre_completo, genero, estado, ubicacion_fisica, observaciones, fk_id_area,
                fk_id_cargo, fecha_ingreso, fecha_retiro)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(
               fila.cedula,
               fila.nombre_completo,
+              fila.genero || null,
               fila.estado,
               fila.ubicacion_fisica || null,
               fila.observaciones || null,

@@ -456,11 +456,11 @@ export default function InventarioPage() {
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] items-end">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="flex flex-wrap gap-2 items-end">
             <Select
               value={filtroArea}
               onChange={(e) => setFiltroArea(e.target.value)}
-              className="w-full max-w-[130px]"
+              className="w-full sm:w-[140px]"
               aria-label="Filtrar por área"
             >
               <option value="">Área</option>
@@ -469,7 +469,7 @@ export default function InventarioPage() {
             <Select
               value={filtroEstado}
               onChange={(e) => setFiltroEstado(e.target.value)}
-              className="w-full max-w-[130px]"
+              className="w-full sm:w-[140px]"
               aria-label="Filtrar por estado"
             >
               <option value="">Estado</option>
@@ -478,7 +478,7 @@ export default function InventarioPage() {
               <option value="critico">Crítico</option>
             </Select>
           </div>
-          <div className="flex justify-end">
+          <div className="flex flex-wrap gap-2 justify-end">
             <Button
               variant="secondary"
               icon={Plus}

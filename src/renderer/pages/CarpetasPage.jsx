@@ -1045,7 +1045,8 @@ export default function CarpetasPage() {
             <p className="font-semibold text-ink-dark mb-2">Qué contiene esta plantilla</p>
             <ul className="list-disc list-inside space-y-2 text-sm text-muted">
               <li>Cédula y Nombre son obligatorios para cada registro.</li>
-              <li>Use las columnas de Área y Cargo si desea asignar ubicación y posición.</li>
+              <li>Ingrese datos de ubicación y observaciones según corresponda.</li>
+              <li>Asigne el área y cargo según corresponda a cada empleado.</li>
               <li>Marque el estado como <strong>Activo</strong> o <strong>Retirado</strong>.</li>
               <li>La plantilla incluye formato para novedad, fechas y observaciones.</li>
               <li>Al descargarla, guárdela como .xlsx y abra en Excel o LibreOffice.</li>
