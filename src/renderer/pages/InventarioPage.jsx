@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Search, AlertTriangle, RefreshCw, Boxes, PackageCheck, Layers,
-  Plus, Pencil, Trash2, SlidersHorizontal, Tag, Package,
+  Plus, Pencil, Trash2, SlidersHorizontal, Tag, Package, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
@@ -17,6 +17,7 @@ import { formatTalla } from '../utils/format';
 
 const TONO_ESTADO = { normal: 'ok', bajo: 'bajo', critico: 'critico' };
 const ETIQUETA_ESTADO = { normal: 'Normal', bajo: 'Bajo', critico: 'Crítico' };
+const REGISTROS_POR_PAGINA = 30;
 
 /** Categorías de talla (campo libre en mayúsculas). */
 const CATEGORIAS_TALLA = {
@@ -171,6 +172,21 @@ export default function InventarioPage() {
       return true;
     });
   }, [variantes, busquedaDebounced, filtroArea, filtroEstado]);
+
+  const [pagina, setPagina] = useState(1);
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / REGISTROS_POR_PAGINA));
+  const variantesPagina = useMemo(() => {
+    const inicio = (pagina - 1) * REGISTROS_POR_PAGINA;
+    return filtrados.slice(inicio, inicio + REGISTROS_POR_PAGINA);
+  }, [filtrados, pagina]);
+
+  useEffect(() => {
+    setPagina(1);
+  }, [busquedaDebounced, filtroArea, filtroEstado]);
+
+  useEffect(() => {
+    if (pagina > totalPaginas) setPagina(totalPaginas);
+  }, [pagina, totalPaginas]);
 
   /* ── Artículo: crear / editar ── */
   const abrirArtNuevo = () => {
@@ -505,7 +521,7 @@ export default function InventarioPage() {
           </div>
         </div>
         <VariantesTable
-          items={filtrados}
+          items={variantesPagina}
           TONO_ESTADO={TONO_ESTADO}
           ETIQUETA_ESTADO={ETIQUETA_ESTADO}
           fmtFecha={fmtFecha}
@@ -522,6 +538,27 @@ export default function InventarioPage() {
           }
         />
       </Card>
+
+      {filtrados.length > 0 && totalPaginas > 1 && (
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-xs text-muted">
+            Mostrando {(pagina - 1) * REGISTROS_POR_PAGINA + 1}-{Math.min(pagina * REGISTROS_POR_PAGINA, filtrados.length)} de {filtrados.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              disabled={pagina === 1} aria-label="Página anterior"
+              className="grid place-items-center w-8 h-8 rounded-lg border border-edge text-subtle hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed">
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-xs font-medium text-ink">Página {pagina} de {totalPaginas}</span>
+            <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              disabled={pagina === totalPaginas} aria-label="Página siguiente"
+              className="grid place-items-center w-8 h-8 rounded-lg border border-edge text-subtle hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal: artículo (crear / editar) ── */}
       <Modal

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Search, Plus, Eye, Truck, AlertTriangle, RefreshCw, Trash2, PackagePlus,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
@@ -16,6 +17,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { formatNombre, formatCedula, normalizarBusqueda } from '../utils/format';
 
 const PERIODOS = ['Abril', 'Agosto', 'Diciembre'];
+const REGISTROS_POR_PAGINA = 30;
 
 function fmt(iso) {
   if (!iso) return '—';
@@ -99,6 +101,21 @@ export default function MovimientosPage() {
       return true;
     });
   }, [entregas, busquedaDebounced, filtroPeriodo, filtroArea, filtroCargo]);
+
+  const [pagina, setPagina] = useState(1);
+  const totalPaginas = Math.max(1, Math.ceil(filtradas.length / REGISTROS_POR_PAGINA));
+  const entregasPagina = useMemo(() => {
+    const inicio = (pagina - 1) * REGISTROS_POR_PAGINA;
+    return filtradas.slice(inicio, inicio + REGISTROS_POR_PAGINA);
+  }, [filtradas, pagina]);
+
+  useEffect(() => {
+    setPagina(1);
+  }, [busquedaDebounced, filtroPeriodo, filtroArea, filtroCargo]);
+
+  useEffect(() => {
+    if (pagina > totalPaginas) setPagina(totalPaginas);
+  }, [pagina, totalPaginas]);
 
   /* ── Ver detalle ── */
   const verDetalle = async (e) => {
@@ -275,11 +292,32 @@ export default function MovimientosPage() {
       {/* Tabla de entregas */}
       <Card className="overflow-hidden">
         <EntregasTable
-          items={filtradas}
+          items={entregasPagina}
           fmt={fmt}
           onDetalle={verDetalle}
         />
       </Card>
+
+      {filtradas.length > 0 && totalPaginas > 1 && (
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-xs text-muted">
+            Mostrando {(pagina - 1) * REGISTROS_POR_PAGINA + 1}-{Math.min(pagina * REGISTROS_POR_PAGINA, filtradas.length)} de {filtradas.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              disabled={pagina === 1} aria-label="Página anterior"
+              className="grid place-items-center w-8 h-8 rounded-lg border border-edge text-subtle hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed">
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-xs font-medium text-ink">Página {pagina} de {totalPaginas}</span>
+            <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              disabled={pagina === totalPaginas} aria-label="Página siguiente"
+              className="grid place-items-center w-8 h-8 rounded-lg border border-edge text-subtle hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal: detalle de entrega ── */}
       <Modal
