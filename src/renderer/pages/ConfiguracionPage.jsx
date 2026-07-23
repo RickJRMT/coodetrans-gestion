@@ -105,7 +105,7 @@ function TabUsuarios({ idUsuario }) {
     <Card className="overflow-hidden">
       <CardHeader title="Usuarios del sistema" subtitle={`${usuarios.length} usuario(s)`} icon={Users}
         action={<Button size="sm" icon={Plus} onClick={abrirNuevo}>Nuevo usuario</Button>} />
-      <div className="overflow-x-auto">
+      <div className="max-h-[520px] overflow-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-edge bg-canvas/50">
@@ -236,7 +236,7 @@ function TabRoles({ idUsuario }) {
     <Card className="overflow-hidden">
       <CardHeader title="Roles del sistema" subtitle={`${roles.length} rol(es)`} icon={UserCog}
         action={<Button size="sm" icon={Plus} onClick={abrirNuevo}>Nuevo rol</Button>} />
-      <div className="overflow-x-auto">
+      <div className="max-h-[520px] overflow-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-edge bg-canvas/50">
@@ -334,7 +334,7 @@ function TabAreas({ idUsuario }) {
     <Card className="overflow-hidden">
       <CardHeader title="Áreas organizacionales" subtitle={`${areas.length} área(s)`} icon={Building2}
         action={<Button size="sm" icon={Plus} onClick={abrirNuevo}>Nueva área</Button>} />
-      <div className="overflow-x-auto">
+      <div className="max-h-[520px] overflow-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-edge bg-canvas/50">
@@ -439,7 +439,7 @@ function TabCargos({ idUsuario }) {
           </Select>
           <Button size="sm" icon={Plus} onClick={abrirNuevo}>Nuevo cargo</Button>
         </div>} />
-      <div className="overflow-x-auto">
+      <div className="max-h-[520px] overflow-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-edge bg-canvas/50">

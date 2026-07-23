@@ -74,6 +74,8 @@ function StockAreaCard({ area, normal, bajo, critico, total }) {
   );
 }
 
+const COLORES_BARRA = ['#0052D4', '#28A745', '#4D89E8'];
+
 /* ─── Etiqueta de valor sobre las barras ───────────────────────────── */
 function BarLabel({ x, y, width, value }) {
   return (
@@ -83,8 +85,6 @@ function BarLabel({ x, y, width, value }) {
     </text>
   );
 }
-
-const COLORES_BARRA = ['#0052D4', '#28A745', '#4D89E8'];
 
 function formatoFecha(iso) {
   if (!iso) return '';

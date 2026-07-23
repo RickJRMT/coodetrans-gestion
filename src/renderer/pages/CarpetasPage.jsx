@@ -3,6 +3,7 @@ import {
   Search, Plus, Pencil, History, MapPin, AlertTriangle, RefreshCw,
   FolderOpen, IdCard, Shirt, Upload, Download, FileSpreadsheet,
   CheckCircle2, XCircle, FileDown,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import Card from '../components/Card';
 import Badge from '../components/Badge';
@@ -21,6 +22,7 @@ import {
 
 const GENEROS = ['Masculino', 'Femenino', 'Otro'];
 const ESTADOS = ['Activo', 'Retirado'];
+const EMPLEADOS_POR_PAGINA = 30;
 
 const EXPORT_FIELDS = [
   { clave: 'cedula', label: 'Cédula' },
@@ -170,6 +172,21 @@ export default function CarpetasPage() {
       return true;
     });
   }, [empleados, busquedaDebounced, filtroEstado, filtroArea, filtroCargo]);
+
+  const [pagina, setPagina] = useState(1);
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / EMPLEADOS_POR_PAGINA));
+  const empleadosPagina = useMemo(() => {
+    const inicio = (pagina - 1) * EMPLEADOS_POR_PAGINA;
+    return filtrados.slice(inicio, inicio + EMPLEADOS_POR_PAGINA);
+  }, [filtrados, pagina]);
+
+  useEffect(() => {
+    setPagina(1);
+  }, [busquedaDebounced, filtroEstado, filtroArea, filtroCargo]);
+
+  useEffect(() => {
+    if (pagina > totalPaginas) setPagina(totalPaginas);
+  }, [pagina, totalPaginas]);
 
   // Cargos disponibles según el área seleccionada en el formulario
   const cargosForm = useMemo(
@@ -508,11 +525,32 @@ export default function CarpetasPage() {
       {/* Tabla (escritorio) con scroll interno y virtualización */}
       <Card className="hidden md:block overflow-hidden p-0">
         <EmpleadosTable
-          items={filtrados}
+          items={empleadosPagina}
           onEdit={abrirEditar}
           onHistory={abrirHistorial}
         />
       </Card>
+
+      {filtrados.length > 0 && totalPaginas > 1 && (
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-xs text-muted">
+            Mostrando {(pagina - 1) * EMPLEADOS_POR_PAGINA + 1}-{Math.min(pagina * EMPLEADOS_POR_PAGINA, filtrados.length)} de {filtrados.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              disabled={pagina === 1} aria-label="Página anterior"
+              className="grid place-items-center w-8 h-8 rounded-lg border border-edge text-subtle hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed">
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-xs font-medium text-ink">Página {pagina} de {totalPaginas}</span>
+            <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              disabled={pagina === totalPaginas} aria-label="Página siguiente"
+              className="grid place-items-center w-8 h-8 rounded-lg border border-edge text-subtle hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tarjetas (móvil) */}
       <div className="md:hidden space-y-3">
@@ -520,7 +558,7 @@ export default function CarpetasPage() {
           <Card className="p-8 text-center text-muted">
             No se encontraron carpetas con los filtros aplicados.
           </Card>
-        ) : filtrados.map((e) => (
+        ) : empleadosPagina.map((e) => (
           <Card key={e.id_empleado} className="p-4">
             <div className="flex items-start justify-between mb-2">
               <div className="min-w-0">
