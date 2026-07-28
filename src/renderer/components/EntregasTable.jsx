@@ -35,7 +35,7 @@ export default function EntregasTable({
       style={{ maxHeight: 'min(520px, calc(100vh - 280px))', height: 'min(520px, calc(100vh - 280px))' }}
       onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
     >
-      <table className="w-full text-sm table-fixed">
+      <table className="w-full min-w-[760px] text-sm table-fixed">
         <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_rgba(0,0,0,0.06)]">
           <tr className="border-b border-edge bg-canvas/50">
             {headers.map((h) => (

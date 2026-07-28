@@ -384,7 +384,7 @@ export default function InventarioPage() {
             Estado de Stock por Área
           </h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {Object.values(resumen).length === 0 ? (
             <Card className="p-6 text-center text-muted col-span-full">Sin datos de stock.</Card>
           ) : Object.values(resumen).map((s) => <StockAreaCard key={s.area} {...s} />)}
@@ -403,59 +403,47 @@ export default function InventarioPage() {
           </div>
           <Button size="sm" icon={Plus} onClick={abrirArtNuevo}>Nueva dotación</Button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-edge bg-canvas/50">
-                {['Dotación', 'Área', 'Stock total', 'Stock mínimo', 'Estado', 'Acciones'].map((h) => (
-                  <th key={h} className="text-left font-semibold text-subtle text-xs uppercase
-                    tracking-wide px-4 py-3 whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {articulos.length === 0 ? (
-                <tr><td colSpan={6} className="text-center text-muted py-10">
-                  No hay dotaciones registradas. Cree la primera con "Nueva dotación".
-                </td></tr>
-              ) : articulos.map((a) => (
-                <tr key={a.id_articulo} className="border-b border-edge/70 last:border-0
-                  hover:bg-canvas/60 transition-colors">
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-2 font-medium text-ink-dark">
-                      <PackageCheck size={15} className="text-muted" />{a.nombre_item}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-ink">{a.nom_area || '—'}</td>
-                  <td className="px-4 py-3 font-bold text-ink-dark">{a.stock_total}</td>
-                  <td className="px-4 py-3 text-muted">{a.stock_minimo}</td>
-                  <td className="px-4 py-3">
-                    <Badge tone={TONO_ESTADO[a.estado]} dot>{ETIQUETA_ESTADO[a.estado]}</Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => abrirVarNueva(a.id_articulo)} title="Agregar variante de talla"
-                        className="grid place-items-center w-8 h-8 rounded-lg text-subtle
-                          hover:bg-primary-light hover:text-primary transition-colors">
-                        <Tag size={16} />
-                      </button>
-                      <button onClick={() => abrirArtEditar(a)} title="Editar dotación"
-                        className="grid place-items-center w-8 h-8 rounded-lg text-subtle
-                          hover:bg-primary-light hover:text-primary transition-colors">
-                        <Pencil size={16} />
-                      </button>
-                      <button onClick={() => abrirConfimacion('articulo', a.id_articulo, a.nombre_item)}
-                        title="Eliminar dotación"
-                        className="grid place-items-center w-8 h-8 rounded-lg text-subtle
-                          hover:bg-danger-light hover:text-danger transition-colors">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="p-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {articulos.length === 0 ? (
+            <div className="md:col-span-2 xl:col-span-3 rounded-xl border border-dashed border-edge p-8 text-center text-muted">
+              No hay dotaciones registradas. Cree la primera con "Nueva dotación".
+            </div>
+          ) : articulos.map((a) => (
+            <div key={a.id_articulo} className="rounded-xl border border-edge bg-canvas/40 p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-ink-dark">{a.nombre_item}</p>
+                  <p className="text-xs text-subtle">{a.nom_area || 'Sin área'}</p>
+                </div>
+                <Badge tone={TONO_ESTADO[a.estado]} dot>{ETIQUETA_ESTADO[a.estado]}</Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded-lg bg-white px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wide text-subtle">Stock total</p>
+                  <p className="font-semibold text-ink-dark">{a.stock_total}</p>
+                </div>
+                <div className="rounded-lg bg-white px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wide text-subtle">Stock mínimo</p>
+                  <p className="font-semibold text-ink-dark">{a.stock_minimo}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 pt-1">
+                <button onClick={() => abrirVarNueva(a.id_articulo)} title="Agregar variante de talla"
+                  className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors">
+                  <Tag size={16} />
+                </button>
+                <button onClick={() => abrirArtEditar(a)} title="Editar dotación"
+                  className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors">
+                  <Pencil size={16} />
+                </button>
+                <button onClick={() => abrirConfimacion('articulo', a.id_articulo, a.nombre_item)}
+                  title="Eliminar dotación"
+                  className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-danger-light hover:text-danger transition-colors">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </Card>
 
@@ -471,7 +459,7 @@ export default function InventarioPage() {
           />
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] items-end">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] items-end">
           <div className="flex flex-wrap gap-2 items-end">
             <Select
               value={filtroArea}
@@ -494,7 +482,7 @@ export default function InventarioPage() {
               <option value="critico">Crítico</option>
             </Select>
           </div>
-          <div className="flex flex-wrap gap-2 justify-end">
+          <div className="flex flex-wrap gap-2 justify-start xl:justify-end">
             <Button
               variant="secondary"
               icon={Plus}
@@ -540,7 +528,7 @@ export default function InventarioPage() {
       </Card>
 
       {filtrados.length > 0 && totalPaginas > 1 && (
-        <div className="flex items-center justify-between gap-3 text-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm">
           <span className="text-xs text-muted">
             Mostrando {(pagina - 1) * REGISTROS_POR_PAGINA + 1}-{Math.min(pagina * REGISTROS_POR_PAGINA, filtrados.length)} de {filtrados.length}
           </span>

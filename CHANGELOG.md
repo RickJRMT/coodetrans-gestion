@@ -4,6 +4,23 @@ Todas las versiones lanzadas del sistema de gestión de dotación de Coodetrans.
 
 ---
 
+## [1.1.2] - 2026-07-28
+
+### 🎯 Objetivo de la versión
+
+Versión enfocada en mejorar la experiencia visual y responsiva de la aplicación, consolidando un diseño más limpio, coherente y preparado para dispositivos móviles y escritorio.
+
+### ✅ Cambios principales
+
+- Se aplicó un segundo pulido visual en los módulos de inventario, movimientos, configuración y carpetas.
+- Se mejoró la responsividad general de la interfaz, incluyendo navegación móvil y distribución de contenidos.
+- Se corrigió el botón de visualización para que utilice el ícono correcto en la vista responsiva.
+- Se implementaron cards responsivas en la vista de variantes por tallas, manteniendo la funcionalidad de filtros, búsqueda y paginación.
+- Se reforzó la coherencia visual entre tablas, cards, formularios y estados vacíos o de carga.
+- Se mejoró la experiencia de visualización de datos en pantallas pequeñas sin afectar la lógica de negocio.
+
+---
+
 ## [1.1.1] - 2026-07-21
 
 ### 🎯 Objetivo de la versión

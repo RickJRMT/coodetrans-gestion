@@ -20,15 +20,25 @@ export function formatTalla(value) {
 }
 
 /**
- * Capitaliza nombres: primera letra mayúscula, resto minúscula.
- * Ej: "PEREZ JUAN" -> "Perez Juan"
+ * Capitaliza nombres de forma más natural para presentación.
+ * Ej: "JULIAN RICARDO" -> "Julian Ricardo"
+ * Ej: "MARIA DEL CARMEN" -> "Maria del Carmen"
  */
 export function capitalizarNombre(nombre) {
   if (!nombre) return '';
-  return String(nombre)
+  const texto = String(nombre).trim();
+  if (!texto) return '';
+
+  const preposiciones = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'y', 'a', 'al', 'dos']);
+  return texto
     .toLowerCase()
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .split(/\s+/)
+    .map((palabra, index) => {
+      if (index > 0 && preposiciones.has(palabra)) {
+        return palabra;
+      }
+      return palabra.charAt(0).toUpperCase() + palabra.slice(1);
+    })
     .join(' ');
 }
 

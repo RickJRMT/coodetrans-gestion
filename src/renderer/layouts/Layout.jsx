@@ -1,9 +1,10 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LogOut, ChevronDown } from 'lucide-react';
+import { LogOut, ChevronDown, Menu, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import { useAuth } from '../hooks/useAuth';
 import logo from '../assets/coodetransLogo.png';
+import { formatNombre } from '../utils/format';
 
 /** Metadatos de cada pantalla (título y subtítulo de la barra superior). */
 const META = {
@@ -28,11 +29,25 @@ export default function Layout() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { usuario, logout } = useAuth();
-  const [menuAbierto, setMenuAbierto] = useState(false);
+  const [sidebarAbierto, setSidebarAbierto] = useState(false);
+  const [usuarioMenuAbierto, setUsuarioMenuAbierto] = useState(false);
+  const [isResponsive, setIsResponsive] = useState(() => window.innerWidth < 1024);
 
   const meta = META[pathname] || { titulo: 'Coodetrans', sub: '' };
 
   useEffect(() => {
+    const media = window.matchMedia('(max-width: 1023px)');
+    const actualizarVista = () => {
+      const responsive = media.matches;
+      setIsResponsive(responsive);
+      if (!responsive) {
+        setSidebarAbierto(false);
+        setUsuarioMenuAbierto(false);
+      }
+    };
+
+    actualizarVista();
+    media.addEventListener?.('change', actualizarVista);
 
     const limpiar1 =
       window.api?.update?.disponible?.((info) => {
@@ -56,6 +71,7 @@ export default function Layout() {
       });
 
     return () => {
+      media.removeEventListener?.('change', actualizarVista);
       limpiar1?.();
       limpiar2?.();
     };
@@ -67,8 +83,8 @@ export default function Layout() {
     navigate('/login', { replace: true });
   };
 
-  const nombreMostrado = usuario?.username || usuario?.nombre_completo || 'Usuario';
-  const nombreCompletoMostrado = usuario?.nombre_completo || '';
+  const nombreMostrado = formatNombre(usuario?.username || usuario?.nombre_completo || 'Usuario');
+  const nombreCompletoMostrado = formatNombre(usuario?.nombre_completo || '');
 
   const iniciales = nombreMostrado
     .split(' ')
@@ -79,14 +95,32 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-canvas">
-      <Sidebar />
+      {isResponsive && sidebarAbierto && (
+        <button
+          type="button"
+          aria-label="Cerrar menú"
+          className="fixed inset-0 z-20 bg-black/40 lg:hidden"
+          onClick={() => setSidebarAbierto(false)}
+        />
+      )}
+      <Sidebar isMobile={isResponsive} isOpen={sidebarAbierto} onClose={() => setSidebarAbierto(false)} />
 
       {/* Contenido */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Barra superior */}
         <header className="h-[68px] bg-white border-b border-edge flex items-center
-          justify-between px-6 shrink-0 z-10">
+          justify-between px-4 sm:px-6 shrink-0 z-10">
           <div className="flex items-center gap-3 min-w-0">
+            {isResponsive && (
+              <button
+                type="button"
+                onClick={() => setSidebarAbierto((v) => !v)}
+                className="grid place-items-center w-9 h-9 rounded-lg border border-edge text-subtle hover:bg-canvas"
+                aria-label="Abrir menú"
+              >
+                {sidebarAbierto ? <X size={18} /> : <Menu size={18} />}
+              </button>
+            )}
             <img src={logo} alt="Coodetrans" className="w-9 h-9 object-contain shrink-0 lg:hidden" />
             <div className="min-w-0">
               <h1 className="text-lg font-bold text-ink-dark leading-tight truncate">{meta.titulo}</h1>
@@ -97,7 +131,7 @@ export default function Layout() {
           {/* Menú de usuario */}
           <div className="relative">
             <button
-              onClick={() => setMenuAbierto((v) => !v)}
+              onClick={() => setUsuarioMenuAbierto((v) => !v)}
               className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-lg
                 hover:bg-canvas transition-colors"
             >
@@ -114,9 +148,9 @@ export default function Layout() {
               <ChevronDown size={15} className="text-muted" />
             </button>
 
-            {menuAbierto && (
+            {usuarioMenuAbierto && (
               <>
-                <div className="fixed inset-0 z-10" onClick={() => setMenuAbierto(false)} />
+                <div className="fixed inset-0 z-10" onClick={() => setUsuarioMenuAbierto(false)} />
                 <div className="absolute right-0 mt-2 w-56 bg-white border border-edge
                   rounded-xl shadow-card-hover py-1.5 z-20 animate-fade-in">
                   <div className="px-4 py-2.5 border-b border-edge">
@@ -140,7 +174,7 @@ export default function Layout() {
         </header>
 
         {/* Área de páginas */}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="animate-fade-in">
             <Outlet />
           </div>

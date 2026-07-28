@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Search, Plus, Pencil, History, MapPin, AlertTriangle, RefreshCw,
   FolderOpen, IdCard, Shirt, Upload, Download, FileSpreadsheet,
-  CheckCircle2, XCircle, FileDown,
+  CheckCircle2, XCircle, FileDown, Eye,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import Card from '../components/Card';
@@ -140,6 +140,10 @@ export default function CarpetasPage() {
   const [historial, setHistorial] = useState([]);
   const [empleadoHist, setEmpleadoHist] = useState(null);
   const [cargandoHist, setCargandoHist] = useState(false);
+
+  // Modal ver empleado
+  const [verAbierto, setVerAbierto] = useState(false);
+  const [empleadoVista, setEmpleadoVista] = useState(null);
 
   const cargarDatos = async () => {
     setCargando(true);
@@ -295,6 +299,11 @@ export default function CarpetasPage() {
     }
   };
 
+  const abrirVista = (e) => {
+    setEmpleadoVista(e);
+    setVerAbierto(true);
+  };
+
   /* ── Importación desde Excel / CSV ── */
   const abrirImportador = () => {
     setPrevia(null);
@@ -439,7 +448,7 @@ export default function CarpetasPage() {
         </div>
 
         {/* Filtros y acciones — Layout final para Control de Carpetas */}
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] items-end">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] items-end">
           <div className="flex flex-wrap gap-2 items-end">
             <Select
               value={filtroEstado}
@@ -474,7 +483,7 @@ export default function CarpetasPage() {
             </Select>
           </div>
 
-          <div className="flex flex-wrap gap-2 justify-end">
+          <div className="flex flex-wrap gap-2 justify-start xl:justify-end">
             <Button
               variant="secondary"
               size="sm"
@@ -528,11 +537,12 @@ export default function CarpetasPage() {
           items={empleadosPagina}
           onEdit={abrirEditar}
           onHistory={abrirHistorial}
+          onView={abrirVista}
         />
       </Card>
 
       {filtrados.length > 0 && totalPaginas > 1 && (
-        <div className="flex items-center justify-between gap-3 text-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm">
           <span className="text-xs text-muted">
             Mostrando {(pagina - 1) * EMPLEADOS_POR_PAGINA + 1}-{Math.min(pagina * EMPLEADOS_POR_PAGINA, filtrados.length)} de {filtrados.length}
           </span>
@@ -578,11 +588,13 @@ export default function CarpetasPage() {
                 <p className="text-xs text-subtle line-clamp-2">{e.observaciones}</p>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" icon={History}
                 onClick={() => abrirHistorial(e)}>Historial</Button>
               <Button size="sm" variant="secondary" icon={Pencil}
                 onClick={() => abrirEditar(e)}>Editar</Button>
+              <Button size="sm" variant="secondary" icon={Eye}
+                onClick={() => abrirVista(e)}>Ver</Button>
             </div>
           </Card>
         ))}
@@ -677,6 +689,73 @@ export default function CarpetasPage() {
               focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary"
             placeholder="Notas adicionales sobre la hoja de vida..." />
         </div>
+      </Modal>
+
+      {/* ── Modal: vista rápida del empleado ── */}
+      <Modal
+        open={verAbierto}
+        onClose={() => setVerAbierto(false)}
+        title={formatNombre(empleadoVista?.nombre_completo || '')}
+        size="lg"
+        footer={<Button variant="secondary" onClick={() => setVerAbierto(false)}>Cerrar</Button>}
+      >
+        {empleadoVista ? (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-edge bg-canvas/40 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-subtle">Empleado</p>
+                  <h4 className="text-lg font-semibold text-ink-dark">{formatNombre(empleadoVista.nombre_completo)}</h4>
+                  <p className="text-sm text-subtle">{formatCedula(empleadoVista.cedula)}</p>
+                </div>
+                <Badge tone={empleadoVista.estado === 'Activo' ? 'ok' : 'neutral'} dot>{empleadoVista.estado || 'Activo'}</Badge>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-edge p-4 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-subtle">Información personal</p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-3"><span className="text-subtle">Género</span><span className="font-medium text-ink">{empleadoVista.genero || '—'}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-subtle">Área</span><span className="font-medium text-ink">{empleadoVista.nom_area || '—'}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-subtle">Cargo</span><span className="font-medium text-ink">{empleadoVista.nom_cargo || 'Sin cargo'}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-subtle">Ubicación</span><span className="font-medium text-ink text-right">{empleadoVista.ubicacion_fisica || '—'}</span></div>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-edge p-4 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-subtle">Dotación</p>
+                <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                  <div className="rounded-lg bg-canvas/70 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wide text-subtle">Camisa</p>
+                    <p className="font-medium text-ink">{empleadoVista.camisa || '—'}</p>
+                  </div>
+                  <div className="rounded-lg bg-canvas/70 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wide text-subtle">Pantalón</p>
+                    <p className="font-medium text-ink">{empleadoVista.pantalon || '—'}</p>
+                  </div>
+                  <div className="rounded-lg bg-canvas/70 px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-wide text-subtle">Calzado</p>
+                    <p className="font-medium text-ink">{empleadoVista.calzado || '—'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-edge p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-subtle">Observaciones y seguimiento</p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between gap-3"><span className="text-subtle">Fecha ingreso</span><span className="font-medium text-ink">{fmt(empleadoVista.fecha_ingreso)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-subtle">Fecha retiro</span><span className="font-medium text-ink">{fmt(empleadoVista.fecha_retiro)}</span></div>
+                </div>
+                <div className="rounded-lg bg-canvas/60 p-3 text-sm text-ink">
+                  <p className="text-subtle mb-1">Observaciones</p>
+                  <p className="leading-6">{empleadoVista.observaciones || 'Sin observaciones registradas.'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </Modal>
 
       {/* ── Modal: historial de dotaciones ── */}

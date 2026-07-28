@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { MapPin, History, Pencil } from 'lucide-react';
+import { MapPin, History, Pencil, Eye } from 'lucide-react';
 import Badge from './Badge';
 import { formatCedula, formatNombre } from '../utils/format';
 
@@ -10,7 +10,7 @@ const BUFFER = 5;
  * Tabla de empleados con altura fija, scroll interno y renderizado virtual
  * para mantener fluidez con grandes volúmenes de datos.
  */
-export default function EmpleadosTable({ items, onEdit, onHistory }) {
+export default function EmpleadosTable({ items, onEdit, onHistory, onView }) {
   const scrollRef = useRef(null);
   const [scrollTop, setScrollTop] = useState(0);
   const containerHeight = 520;
@@ -31,7 +31,7 @@ export default function EmpleadosTable({ items, onEdit, onHistory }) {
       style={{ maxHeight: 'min(520px, calc(100vh - 280px))', height: 'min(520px, calc(100vh - 280px))' }}
       onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
     >
-      <table className="w-full text-sm table-fixed">
+      <table className="w-full min-w-[860px] text-sm table-fixed">
         <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_rgba(0,0,0,0.06)]">
           <tr className="border-b border-edge bg-canvas/50">
             {headers.map((h) => (
@@ -91,6 +91,14 @@ export default function EmpleadosTable({ items, onEdit, onHistory }) {
                   </td>
                   <td className="px-4 py-3 align-middle">
                     <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onView?.(e)}
+                        title="Ver empleado"
+                        className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors"
+                      >
+                        <Eye size={16} />
+                      </button>
                       <button
                         type="button"
                         onClick={() => onHistory(e)}

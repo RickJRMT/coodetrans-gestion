@@ -39,11 +39,11 @@ export default function Modal({ open, onClose, title, children, footer, size = '
     >
       <div
         className={`w-full ${anchos[size]} bg-white rounded-xl shadow-2xl
-          max-h-[90vh] flex flex-col overflow-hidden`}
+          max-h-[95vh] flex flex-col overflow-hidden`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-edge">
-          <h3 className="text-base font-semibold text-ink-dark">{title}</h3>
+        <div className="flex items-center justify-between gap-3 px-4 py-4 border-b border-edge sm:px-5">
+          <h3 className="text-base font-semibold text-ink-dark truncate">{title}</h3>
           <button
             onClick={onClose}
             className="grid place-items-center w-8 h-8 rounded-lg text-muted
@@ -52,9 +52,9 @@ export default function Modal({ open, onClose, title, children, footer, size = '
             <X size={18} />
           </button>
         </div>
-        <div className="px-5 py-4 overflow-y-auto">{children}</div>
+        <div className="px-4 py-4 overflow-y-auto sm:px-5">{children}</div>
         {footer && (
-          <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-edge bg-canvas/50">
+          <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-4 border-t border-edge bg-canvas/50 sm:px-5">
             {footer}
           </div>
         )}

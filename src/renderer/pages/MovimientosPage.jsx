@@ -228,7 +228,7 @@ export default function MovimientosPage() {
           />
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] items-end">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] items-end">
           <div className="flex flex-wrap gap-2 items-end">
             <Select
               value={filtroPeriodo}
@@ -275,7 +275,7 @@ export default function MovimientosPage() {
               ))}
             </Select>
           </div>
-          <div className="flex flex-wrap gap-2 justify-end">
+          <div className="flex flex-wrap gap-2 justify-start xl:justify-end">
             <Button
               icon={Plus}
               onClick={abrirNueva}
@@ -289,17 +289,43 @@ export default function MovimientosPage() {
         <p className="text-xs text-muted mt-3">{filtradas.length} entrega(s)</p>
       </Card>
 
-      {/* Tabla de entregas */}
+      {/* Cards de entregas */}
       <Card className="overflow-hidden">
-        <EntregasTable
-          items={entregasPagina}
-          fmt={fmt}
-          onDetalle={verDetalle}
-        />
+        <div className="p-4 space-y-3 md:hidden">
+          {entregasPagina.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-edge p-8 text-center text-muted">No hay entregas registradas con los filtros aplicados.</div>
+          ) : entregasPagina.map((e) => (
+            <div key={e.id_entrega} className="rounded-xl border border-edge bg-canvas/40 p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-ink-dark">{formatNombre(e.empleado)}</p>
+                  <p className="text-xs text-subtle">{formatCedula(e.cedula)}</p>
+                </div>
+                <Badge tone="info">{e.periodo}</Badge>
+              </div>
+              <div className="text-sm text-ink space-y-1">
+                <p><span className="text-subtle">Fecha:</span> {fmt(e.fecha_entrega)}</p>
+                <p><span className="text-subtle">Artículos:</span> {e.items}</p>
+                <p><span className="text-subtle">Unidades:</span> {e.total_unidades}</p>
+                <p><span className="text-subtle">Registró:</span> {e.usuario || '—'}</p>
+              </div>
+              <button type="button" onClick={() => verDetalle(e)} className="inline-flex items-center gap-2 rounded-lg border border-edge bg-white px-3 py-2 text-sm text-primary">
+                <Eye size={15} /> Ver detalle
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="hidden md:block">
+          <EntregasTable
+            items={entregasPagina}
+            fmt={fmt}
+            onDetalle={verDetalle}
+          />
+        </div>
       </Card>
 
       {filtradas.length > 0 && totalPaginas > 1 && (
-        <div className="flex items-center justify-between gap-3 text-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm">
           <span className="text-xs text-muted">
             Mostrando {(pagina - 1) * REGISTROS_POR_PAGINA + 1}-{Math.min(pagina * REGISTROS_POR_PAGINA, filtradas.length)} de {filtradas.length}
           </span>

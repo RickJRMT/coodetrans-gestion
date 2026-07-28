@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FolderOpen, Package, History, Settings,
@@ -21,17 +21,23 @@ const NAV_ITEMS = [
   { to: '/configuracion', label: 'Configuración',              Icon: Settings        },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isMobile = false, isOpen = false, onClose = () => {} }) {
   const version = useAppVersion();
   const [expandida, setExpandida] = useState(false);
 
+  useEffect(() => {
+    if (!isMobile) setExpandida(false);
+  }, [isMobile]);
+
+  const width = isMobile ? (isOpen ? 240 : 0) : expandida ? 240 : 64;
+
   return (
     <aside
-      onMouseEnter={() => setExpandida(true)}
-      onMouseLeave={() => setExpandida(false)}
-      className="sidebar-gradient h-full flex flex-col shrink-0 shadow-sidebar
-        overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] z-20"
-      style={{ width: expandida ? 240 : 64 }}
+      onMouseEnter={() => !isMobile && setExpandida(true)}
+      onMouseLeave={() => !isMobile && setExpandida(false)}
+      className={`sidebar-gradient h-full flex flex-col shrink-0 shadow-sidebar
+        overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] z-30 fixed inset-y-0 left-0 lg:static ${isMobile ? (isOpen ? 'pointer-events-auto' : 'pointer-events-none') : ''}`}
+      style={{ width }}
     >
       {/* Encabezado de marca */}
       <div
@@ -70,11 +76,12 @@ export default function Sidebar() {
           <NavLink
             key={to}
             to={to}
-            title={!expandida ? label : undefined}
+            onClick={() => isMobile && onClose()}
+            title={!expandida && !isMobile ? label : undefined}
             className={({ isActive }) =>
               `relative flex items-center rounded-lg cursor-pointer
                transition-all duration-150 group
-               ${expandida ? 'gap-3 px-3.5 py-2.5 justify-start' : 'justify-center p-2.5'}
+               ${expandida || isMobile ? 'gap-3 px-3.5 py-2.5 justify-start' : 'justify-center p-2.5'}
                ${isActive
                  ? 'bg-white/15 text-white font-semibold'
                  : 'text-white/60 hover:bg-white/[0.07] hover:text-white'}`
@@ -89,7 +96,7 @@ export default function Sidebar() {
                 <span
                   className="overflow-hidden whitespace-nowrap text-[13px]
                     transition-all duration-300"
-                  style={{ width: expandida ? 'auto' : 0, opacity: expandida ? 1 : 0 }}
+                  style={{ width: expandida || isMobile ? 'auto' : 0, opacity: expandida || isMobile ? 1 : 0 }}
                 >
                   {label}
                 </span>
@@ -101,11 +108,11 @@ export default function Sidebar() {
 
       {/* Pie con marca RickLabs */}
       <div className="border-t border-white/10 px-3 py-3 flex flex-col items-center gap-1">
-        {expandida && (
+        {(expandida || isMobile) && (
           <span className="text-white/25 text-[10px]">v{version} — SQLite3 Local</span>
         )}
         <span className="text-white/25 text-[9px] tracking-wide whitespace-nowrap">
-          {expandida ? 'Desarrollado por RickLabs' : 'RL'}
+          {expandida || isMobile ? 'Desarrollado por RickLabs' : 'RL'}
         </span>
       </div>
     </aside>

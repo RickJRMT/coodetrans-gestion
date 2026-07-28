@@ -105,41 +105,33 @@ function TabUsuarios({ idUsuario }) {
     <Card className="overflow-hidden">
       <CardHeader title="Usuarios del sistema" subtitle={`${usuarios.length} usuario(s)`} icon={Users}
         action={<Button size="sm" icon={Plus} onClick={abrirNuevo}>Nuevo usuario</Button>} />
-      <div className="max-h-[520px] overflow-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-edge bg-canvas/50">
-              {['Usuario', 'Empleado', 'Rol', 'Último acceso', 'Estado', 'Acciones'].map((h) => (
-                <th key={h} className="text-left font-semibold text-subtle text-xs uppercase
-                  tracking-wide px-4 py-3 whitespace-nowrap">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {usuarios.map((u) => (
-              <tr key={u.id_usuario} className="border-b border-edge/70 last:border-0 hover:bg-canvas/60">
-                <td className="px-4 py-3 font-medium text-ink-dark">@{u.username}</td>
-                <td className="px-4 py-3 text-ink">{formatNombre(u.nombre_completo)}</td>
-                <td className="px-4 py-3"><Badge tone={u.rol === 'Administrador' ? 'info' : 'neutral'}>{u.rol}</Badge></td>
-                <td className="px-4 py-3 text-xs text-muted">{fmtFechaHora(u.ultimo_acceso)}</td>
-                <td className="px-4 py-3"><EstadoBadge estado={u.estado} /></td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => abrirEditar(u)} title="Editar"
-                      className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors">
-                      <Pencil size={16} />
-                    </button>
-                    <button onClick={() => alternarEstado(u)} title={u.estado === 'Activo' ? 'Desactivar' : 'Activar'}
-                      className={`grid place-items-center w-8 h-8 rounded-lg transition-colors
-                        ${u.estado === 'Activo' ? 'text-subtle hover:bg-danger-light hover:text-danger' : 'text-subtle hover:bg-ok-light hover:text-ok-dark'}`}>
-                      <Power size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="p-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {usuarios.map((u) => (
+          <div key={u.id_usuario} className="rounded-xl border border-edge bg-canvas/40 p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-ink-dark">@{u.username}</p>
+                <p className="text-sm text-subtle">{formatNombre(u.nombre_completo)}</p>
+              </div>
+              <Badge tone={u.rol === 'Administrador' ? 'info' : 'neutral'}>{u.rol}</Badge>
+            </div>
+            <div className="space-y-1 text-sm text-ink">
+              <p><span className="text-subtle">Último acceso:</span> {fmtFechaHora(u.ultimo_acceso)}</p>
+              <p><span className="text-subtle">Estado:</span> <EstadoBadge estado={u.estado} /></p>
+            </div>
+            <div className="flex items-center gap-1 pt-1">
+              <button onClick={() => abrirEditar(u)} title="Editar"
+                className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors">
+                <Pencil size={16} />
+              </button>
+              <button onClick={() => alternarEstado(u)} title={u.estado === 'Activo' ? 'Desactivar' : 'Activar'}
+                className={`grid place-items-center w-8 h-8 rounded-lg transition-colors
+                  ${u.estado === 'Activo' ? 'text-subtle hover:bg-danger-light hover:text-danger' : 'text-subtle hover:bg-ok-light hover:text-ok-dark'}`}>
+                <Power size={16} />
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)}
@@ -236,33 +228,24 @@ function TabRoles({ idUsuario }) {
     <Card className="overflow-hidden">
       <CardHeader title="Roles del sistema" subtitle={`${roles.length} rol(es)`} icon={UserCog}
         action={<Button size="sm" icon={Plus} onClick={abrirNuevo}>Nuevo rol</Button>} />
-      <div className="max-h-[520px] overflow-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-edge bg-canvas/50">
-              {['Rol', 'Descripción', 'Estado', 'Acciones'].map((h) => (
-                <th key={h} className="text-left font-semibold text-subtle text-xs uppercase tracking-wide px-4 py-3">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {roles.map((r) => (
-              <tr key={r.id_rol} className="border-b border-edge/70 last:border-0 hover:bg-canvas/60">
-                <td className="px-4 py-3 font-medium text-ink-dark">{r.nombre}</td>
-                <td className="px-4 py-3 text-ink">{r.descripcion || '—'}</td>
-                <td className="px-4 py-3"><EstadoBadge estado={r.estado} /></td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => abrirEditar(r)} title="Editar"
-                      className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors"><Pencil size={16} /></button>
-                    <button onClick={() => alternarEstado(r)} title={r.estado === 'Activo' ? 'Desactivar' : 'Activar'}
-                      className={`grid place-items-center w-8 h-8 rounded-lg transition-colors ${r.estado === 'Activo' ? 'text-subtle hover:bg-danger-light hover:text-danger' : 'text-subtle hover:bg-ok-light hover:text-ok-dark'}`}><Power size={16} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="p-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {roles.map((r) => (
+          <div key={r.id_rol} className="rounded-xl border border-edge bg-canvas/40 p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-ink-dark">{r.nombre}</p>
+                <p className="text-sm text-subtle">{r.descripcion || 'Sin descripción'}</p>
+              </div>
+              <EstadoBadge estado={r.estado} />
+            </div>
+            <div className="flex items-center gap-1 pt-1">
+              <button onClick={() => abrirEditar(r)} title="Editar"
+                className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors"><Pencil size={16} /></button>
+              <button onClick={() => alternarEstado(r)} title={r.estado === 'Activo' ? 'Desactivar' : 'Activar'}
+                className={`grid place-items-center w-8 h-8 rounded-lg transition-colors ${r.estado === 'Activo' ? 'text-subtle hover:bg-danger-light hover:text-danger' : 'text-subtle hover:bg-ok-light hover:text-ok-dark'}`}><Power size={16} /></button>
+            </div>
+          </div>
+        ))}
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title={editando ? 'Editar rol' : 'Nuevo rol'} size="sm"
@@ -334,33 +317,24 @@ function TabAreas({ idUsuario }) {
     <Card className="overflow-hidden">
       <CardHeader title="Áreas organizacionales" subtitle={`${areas.length} área(s)`} icon={Building2}
         action={<Button size="sm" icon={Plus} onClick={abrirNuevo}>Nueva área</Button>} />
-      <div className="max-h-[520px] overflow-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-edge bg-canvas/50">
-              {['Área', 'Cargos', 'Estado', 'Acciones'].map((h) => (
-                <th key={h} className="text-left font-semibold text-subtle text-xs uppercase tracking-wide px-4 py-3">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {areas.map((a) => (
-              <tr key={a.id_area} className="border-b border-edge/70 last:border-0 hover:bg-canvas/60">
-                <td className="px-4 py-3 font-medium text-ink-dark">{a.nom_area}</td>
-                <td className="px-4 py-3 text-ink">{a.cargos}</td>
-                <td className="px-4 py-3"><EstadoBadge estado={a.estado} /></td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => abrirEditar(a)} title="Editar"
-                      className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors"><Pencil size={16} /></button>
-                    <button onClick={() => alternarEstado(a)} title={a.estado === 'Activo' ? 'Desactivar' : 'Activar'}
-                      className={`grid place-items-center w-8 h-8 rounded-lg transition-colors ${a.estado === 'Activo' ? 'text-subtle hover:bg-danger-light hover:text-danger' : 'text-subtle hover:bg-ok-light hover:text-ok-dark'}`}><Power size={16} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="p-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {areas.map((a) => (
+          <div key={a.id_area} className="rounded-xl border border-edge bg-canvas/40 p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-ink-dark">{a.nom_area}</p>
+                <p className="text-sm text-subtle">{a.cargos || 'Sin cargos asociados'}</p>
+              </div>
+              <EstadoBadge estado={a.estado} />
+            </div>
+            <div className="flex items-center gap-1 pt-1">
+              <button onClick={() => abrirEditar(a)} title="Editar"
+                className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors"><Pencil size={16} /></button>
+              <button onClick={() => alternarEstado(a)} title={a.estado === 'Activo' ? 'Desactivar' : 'Activar'}
+                className={`grid place-items-center w-8 h-8 rounded-lg transition-colors ${a.estado === 'Activo' ? 'text-subtle hover:bg-danger-light hover:text-danger' : 'text-subtle hover:bg-ok-light hover:text-ok-dark'}`}><Power size={16} /></button>
+            </div>
+          </div>
+        ))}
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title={editando ? 'Editar área' : 'Nueva área'} size="sm"
@@ -432,40 +406,31 @@ function TabCargos({ idUsuario }) {
   return (
     <Card className="overflow-hidden">
       <CardHeader title="Cargos por área" subtitle={`${filtrados.length} cargo(s)`} icon={Briefcase}
-        action={<div className="flex items-center gap-2">
+        action={<div className="flex flex-wrap items-center gap-2">
           <Select value={filtroArea} onChange={(e) => setFiltroArea(e.target.value)} className="min-w-[150px]">
             <option value="">Todas las áreas</option>
             {areas.map((a) => <option key={a.id_area} value={a.id_area}>{a.nom_area}</option>)}
           </Select>
           <Button size="sm" icon={Plus} onClick={abrirNuevo}>Nuevo cargo</Button>
         </div>} />
-      <div className="max-h-[520px] overflow-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-edge bg-canvas/50">
-              {['Cargo', 'Área', 'Estado', 'Acciones'].map((h) => (
-                <th key={h} className="text-left font-semibold text-subtle text-xs uppercase tracking-wide px-4 py-3">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtrados.map((c) => (
-              <tr key={c.id_cargo} className="border-b border-edge/70 last:border-0 hover:bg-canvas/60">
-                <td className="px-4 py-3 font-medium text-ink-dark">{c.nom_cargo}</td>
-                <td className="px-4 py-3 text-ink">{c.nom_area}</td>
-                <td className="px-4 py-3"><EstadoBadge estado={c.estado} /></td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => abrirEditar(c)} title="Editar"
-                      className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors"><Pencil size={16} /></button>
-                    <button onClick={() => alternarEstado(c)} title={c.estado === 'Activo' ? 'Desactivar' : 'Activar'}
-                      className={`grid place-items-center w-8 h-8 rounded-lg transition-colors ${c.estado === 'Activo' ? 'text-subtle hover:bg-danger-light hover:text-danger' : 'text-subtle hover:bg-ok-light hover:text-ok-dark'}`}><Power size={16} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="p-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {filtrados.map((c) => (
+          <div key={c.id_cargo} className="rounded-xl border border-edge bg-canvas/40 p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-ink-dark">{c.nom_cargo}</p>
+                <p className="text-sm text-subtle">{c.nom_area}</p>
+              </div>
+              <EstadoBadge estado={c.estado} />
+            </div>
+            <div className="flex items-center gap-1 pt-1">
+              <button onClick={() => abrirEditar(c)} title="Editar"
+                className="grid place-items-center w-8 h-8 rounded-lg text-subtle hover:bg-primary-light hover:text-primary transition-colors"><Pencil size={16} /></button>
+              <button onClick={() => alternarEstado(c)} title={c.estado === 'Activo' ? 'Desactivar' : 'Activar'}
+                className={`grid place-items-center w-8 h-8 rounded-lg transition-colors ${c.estado === 'Activo' ? 'text-subtle hover:bg-danger-light hover:text-danger' : 'text-subtle hover:bg-ok-light hover:text-ok-dark'}`}><Power size={16} /></button>
+            </div>
+          </div>
+        ))}
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title={editando ? 'Editar cargo' : 'Nuevo cargo'} size="sm"
@@ -623,7 +588,7 @@ export default function ConfiguracionPage() {
       <div className="flex flex-wrap gap-1 bg-white border border-edge rounded-xl p-1.5 shadow-card">
         {TABS.map(({ id, label, Icon }) => (
           <button key={id} onClick={() => setTab(id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap
               ${tab === id ? 'bg-primary text-white shadow-sm' : 'text-subtle hover:bg-canvas hover:text-ink'}`}>
             <Icon size={16} /> {label}
           </button>
