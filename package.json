@@ -14,6 +14,7 @@
     "dev:renderer": "vite",
     "dev:electron": "wait-on tcp:5173 && cross-env NODE_ENV=development electron .",
     "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
+    "postinstall": "node scripts/ensure-native-deps.js",
     "build:renderer": "vite build",
     "build": "npm run prepare:icons && npm run build:renderer && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --x64",
     "build:portable": "npm run prepare:icons && npm run build:renderer && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win portable --x64",
@@ -39,6 +40,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@electron/node-gyp": "^10.2.0-electron.2",
     "@electron/rebuild": "^3.7.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
