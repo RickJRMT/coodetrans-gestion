@@ -53,6 +53,11 @@
     "vite": "^6.0.3",
     "wait-on": "^8.0.1"
   },
+  "overrides": {
+    "@electron/rebuild": {
+      "@electron/node-gyp": "10.2.0-electron.2"
+    }
+  },
   "build": {
     "appId": "com.ricklabs.coodetrans.gestion",
     "productName": "coodetrans-gestión",
