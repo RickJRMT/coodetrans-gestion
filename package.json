@@ -15,12 +15,13 @@
     "dev:electron": "wait-on tcp:5173 && cross-env NODE_ENV=development electron .",
     "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
     "postinstall": "node scripts/ensure-native-deps.js",
+    "check:signing": "dotenv -e .env -- node scripts/check-signing.js",
     "build:renderer": "vite build",
-    "build": "npm run prepare:icons && npm run build:renderer && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --x64",
-    "build:portable": "npm run prepare:icons && npm run build:renderer && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win portable --x64",
-    "build:installer": "npm run prepare:icons && npm run build:renderer && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis --x64",
-    "build:signed": "npm run prepare:icons && npm run build:renderer && electron-builder --win --x64",
-    "build:signed:installer": "npm run prepare:icons && npm run build:renderer && electron-builder --win nsis --x64",
+    "build": "npm run check:signing && npm run prepare:icons && npm run build:renderer && dotenv -e .env -- cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --x64",
+    "build:portable": "npm run check:signing && npm run prepare:icons && npm run build:renderer && dotenv -e .env -- cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win portable --x64",
+    "build:installer": "npm run check:signing && npm run prepare:icons && npm run build:renderer && dotenv -e .env -- cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis --x64",
+    "build:signed": "npm run check:signing && npm run prepare:icons && npm run build:renderer && dotenv -e .env -- cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --x64",
+    "build:signed:installer": "npm run check:signing && npm run prepare:icons && npm run build:renderer && dotenv -e .env -- cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis --x64",
     "build:all": "npm run build:renderer && electron-builder -mwl",
     "start": "cross-env NODE_ENV=development electron .",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
@@ -46,6 +47,7 @@
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.0",
     "cross-env": "^7.0.3",
+    "dotenv-cli": "^11.0.0",
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
     "png-to-ico": "^3.0.1",
@@ -62,9 +64,9 @@
   },
   "build": {
     "appId": "com.ricklabs.coodetrans.gestion",
-    "productName": "coodetrans-gestión",
+    "productName": "coodetrans-gestion",
     "copyright": "Copyright © 2026 RickLabs. Todos los derechos reservados.",
-    "artifactName": "${productName}-setup-${version}.${ext}",
+    "artifactName": "${productName}-v${version}.${ext}",
     "compression": "maximum",
     "asar": true,
     "forceCodeSigning": false,
@@ -122,14 +124,12 @@
         }
       ],
       "icon": "build/icon.ico",
-      "publisherName": "RickLabs",
       "executableName": "CoodetransGestion",
       "verifyUpdateCodeSignature": false,
       "legalTrademarks": "Coodetrans es marca de la cooperativa Coodetrans.",
       "requestedExecutionLevel": "asInvoker",
       "signtoolOptions": {
-        "publisherName": "RickLabs",
-        "rfc3161TimeStampServer": "http://timestamp.digicert.com"
+        "publisherName": "RickLabs"
       }
     },
     "nsis": {
