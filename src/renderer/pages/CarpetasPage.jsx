@@ -250,6 +250,7 @@ export default function CarpetasPage() {
     });
   };
 
+
   const guardar = async () => {
     setErrorForm('');
     if (!form.cedula.trim()) return setErrorForm('La cédula es obligatoria.');
