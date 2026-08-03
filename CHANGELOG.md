@@ -4,6 +4,22 @@ Todas las versiones lanzadas del sistema de gestión de dotación de Coodetrans.
 
 ---
 
+## [1.1.3] - 2026-07-30
+
+### 🔐 Seguridad y Distribución
+Firma digital: Integración del proceso de firma de ejecutables mediante Electron Builder y validación previa (check-signing.js).
+
+Variables de entorno: Migración de credenciales y certificados a un archivo .env (con plantilla .env.example) y actualización del .gitignore.
+
+Preparación para CA: Reestructuración de la configuración para facilitar el cambio futuro a certificados emitidos por una Autoridad Certificadora oficial.
+
+### 🧪 Pruebas y Validaciones
+Verificación exitosa de la firma mediante herramientas de Windows (SignTool y Get-AuthenticodeSignature) con sello de tiempo aplicado.
+
+Pruebas de funcionamiento del ejecutable Portable (x64) en equipos externos utilizando un certificado autofirmado de desarrollo.
+
+---
+
 ## [1.1.2] - 2026-07-28
 
 ### 🎯 Objetivo de la versión
